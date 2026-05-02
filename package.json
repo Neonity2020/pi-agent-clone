@@ -1,0 +1,27 @@
+{
+  "name": "pi-agent-clone",
+  "version": "0.1.0",
+  "description": "A pi-agent clone — AI coding agent with multi-provider support",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "pi-agent": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/cli/index.ts",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@google/generative-ai": "^0.24.0",
+    "dotenv": "^17.4.2",
+    "openai": "^4.103.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3"
+  }
+}
