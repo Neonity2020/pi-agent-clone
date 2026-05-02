@@ -10,7 +10,10 @@ dist/
 # Agent output (keep README and docs)
 .agent-output/*
 !.agent-output/README.md
+!.agent-output/artifacts/
+!.agent-output/artifacts/*
 !.agent-output/artifacts/docs/
+!.agent-output/artifacts/docs/*
 
 # IDE
 .vscode/
