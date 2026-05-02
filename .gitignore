@@ -7,13 +7,12 @@ dist/
 # Environment variables
 .env
 
-# Agent output (keep README and docs)
-.agent-output/*
-!.agent-output/README.md
-!.agent-output/artifacts/
-!.agent-output/artifacts/*
-!.agent-output/artifacts/docs/
-!.agent-output/artifacts/docs/*
+# Agent output - ignore everything except README.md and docs
+/.agent-output/*
+!/.agent-output/README.md
+!/.agent-output/artifacts/
+!/.agent-output/artifacts/docs/
+!/.agent-output/artifacts/docs/*
 
 # IDE
 .vscode/
