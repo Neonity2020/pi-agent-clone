@@ -6,3 +6,4 @@ export { gitStatusTool } from "./git-status.js";
 export { gitLogTool } from "./git-log.js";
 export { gitDiffTool } from "./git-diff.js";
 export { lsTool } from "./ls.js";
+export { memoryWriteTool, memoryReadTool, memorySearchTool, memoryRemoveTool } from "./memory.js";

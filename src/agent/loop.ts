@@ -8,6 +8,7 @@
 //   - Graceful abort handling
 //   - Error recovery
 //   - Context window protection (80% threshold)
+//   - MEMORY.md injection into system prompt for long-term memory
 // ============================================================================
 
 import type {
@@ -24,11 +25,13 @@ import type {
 } from "../types.js";
 import { getTransportForModel } from "../provider/registry.js";
 import { trimMessages, getContextInfo } from "../context/index.js";
+import { formatMemoryForPrompt } from "../memory/index.js";
 
 export class AgentLoop {
   private config: AgentConfig;
   private messages: Message[] = [];
   private abortController: AbortController | null = null;
+  private cachedSystemPrompt: string | null = null;
 
   constructor(config: AgentConfig) {
     this.config = config;
@@ -42,6 +45,50 @@ export class AgentLoop {
   /** Abort the current run */
   abort(): void {
     this.abortController?.abort();
+  }
+
+  /**
+   * Build the system prompt, injecting MEMORY.md content if available.
+   * The prompt structure:
+   *   1. Base system prompt (from config)
+   *   2. Memory section (if MEMORY.md has entries)
+   *   3. Memory usage instructions
+   */
+  private async buildSystemPrompt(): Promise<string> {
+    const basePrompt = this.config.systemPrompt || "You are a helpful AI assistant.";
+
+    // Read memory entries
+    const memoryContent = await formatMemoryForPrompt();
+
+    if (!memoryContent) {
+      return basePrompt;
+    }
+
+    // Inject memory into system prompt
+    const memorySection = [
+      "",
+      "══════════════════════════════════════════════",
+      "LONG-TERM MEMORY (persistent across sessions)",
+      "══════════════════════════════════════════════",
+      memoryContent,
+      "══════════════════════════════════════════════",
+      "",
+      "The above facts are from your long-term memory (MEMORY.md). They persist across conversations.",
+      "Use memory_write to save new important facts (user preferences, project conventions, environment details).",
+      "Use memory_read to review all memories. Use memory_search to find specific memories.",
+      "Use memory_remove to delete outdated entries.",
+      "",
+    ].join("\n");
+
+    return basePrompt + memorySection;
+  }
+
+  /**
+   * Invalidate the cached system prompt (called after memory changes).
+   * Next LLM call will rebuild the prompt with fresh memory content.
+   */
+  invalidateMemoryCache(): void {
+    this.cachedSystemPrompt = null;
   }
 
   /**
@@ -61,6 +108,9 @@ export class AgentLoop {
       events.push(event);
       onEvent?.(event);
     };
+
+    // Build system prompt with memory injection (rebuilt each run)
+    let systemPrompt = await this.buildSystemPrompt();
 
     // Add user message to history
     this.messages.push({ role: "user", content: userMessage });
@@ -83,7 +133,6 @@ export class AgentLoop {
           emit({
             type: "turn_start",
           } as any);
-          // Emit a debug event for context trim (optional)
           console.warn(
             `[Context] Trimmed from ${beforeLength} to ${this.messages.length} messages ` +
               `(${contextInfo.usagePercentage}% of ${contextInfo.contextWindow} tokens)`,
@@ -92,8 +141,8 @@ export class AgentLoop {
           emit({ type: "turn_start" });
         }
 
-        // Stream LLM response
-        const assistantMessage = await this.streamResponse(emit, totalUsage);
+        // Stream LLM response (use memory-injected system prompt)
+        const assistantMessage = await this.streamResponse(emit, totalUsage, systemPrompt);
 
         // Check for errors or abort
         if (assistantMessage.stopReason === "error") {
@@ -120,16 +169,17 @@ export class AgentLoop {
         // Execute tool calls
         const toolResults = await this.executeToolCalls(toolCalls, emit);
 
+        // If memory was written/removed, rebuild system prompt for next turn
+        if (toolCalls.some((tc) => tc.name === "memory_write" || tc.name === "memory_remove")) {
+          systemPrompt = await this.buildSystemPrompt();
+        }
+
         // Add tool results to history
         for (const result of toolResults) {
           this.messages.push(result);
         }
 
         emit({ type: "turn_end" });
-
-        // If stop reason was tool_use, continue the loop to get next response
-        // If stop reason was max_tokens or stop, we still continue because
-        // the LLM explicitly asked for tool execution
       }
 
       if (iterations >= this.config.maxIterations) {
@@ -158,13 +208,14 @@ export class AgentLoop {
   private async streamResponse(
     emit: (event: AgentEvent) => void,
     totalUsage: Usage,
+    systemPrompt: string,
   ): Promise<AssistantMessage> {
     const transport = getTransportForModel(this.config.model);
 
     const stream = transport.stream({
       model: this.config.model,
       messages: this.messages,
-      systemPrompt: this.config.systemPrompt,
+      systemPrompt,  // Use memory-injected system prompt
       tools: this.config.tools?.map((t) => t.definition),
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,

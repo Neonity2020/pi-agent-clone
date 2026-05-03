@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================================
-// pi-agent-clone — Interactive REPL
+// pi-agent-clone — Interactive REPL with long-term memory
 // ============================================================================
 
 // Suppress punycode deprecation warning from openai SDK on Node.js 22+
@@ -10,7 +10,16 @@ import "dotenv/config";
 import * as readline from "readline";
 import { AgentLoop } from "../agent/loop.js";
 import { listProviders } from "../provider/registry.js";
-import { terminalTool, readFileTool, writeFileTool } from "../tool/index.js";
+import {
+  terminalTool,
+  readFileTool,
+  writeFileTool,
+  memoryWriteTool,
+  memoryReadTool,
+  memorySearchTool,
+  memoryRemoveTool,
+} from "../tool/index.js";
+import { getMemoryStats, formatMemoryForPrompt } from "../memory/index.js";
 import type { AgentConfig, AgentEvent, Model, ProviderName } from "../types.js";
 
 // ---- Built-in models -------------------------------------------------------
@@ -111,7 +120,7 @@ function parseArgs(): { model: string; provider?: string } {
       provider = args[++i];
     } else if (args[i] === "--help" || args[i] === "-h") {
       console.log(`
-pi-agent-clone v0.1.0 — AI coding agent
+pi-agent-clone v0.1.0 — AI coding agent with long-term memory
 
 Usage: pi-clone [options]
 
@@ -133,6 +142,9 @@ Environment variables:
   GEMINI_API_KEY      Google Gemini API key
   GLM_API_KEY         智谱 AI API key
   MINIMAX_API_KEY     MiniMax API key
+
+Long-term memory:
+  ~/.pi-agent/MEMORY.md — persists across sessions
 `);
       process.exit(0);
     } else if (!args[i].startsWith("-")) {
@@ -155,6 +167,7 @@ const ANSI = {
   cyan: "\x1b[36m",
   red: "\x1b[31m",
   gray: "\x1b[90m",
+  magenta: "\x1b[35m",
 };
 
 // ---- Main ------------------------------------------------------------------
@@ -168,20 +181,35 @@ async function main() {
     process.exit(1);
   }
 
+  // All tools including memory tools
+  const allTools = [
+    terminalTool,
+    readFileTool,
+    writeFileTool,
+    memoryWriteTool,
+    memoryReadTool,
+    memorySearchTool,
+    memoryRemoveTool,
+  ];
+
   // Build agent config
   const config: AgentConfig = {
     model,
     systemPrompt: "You are a helpful AI coding assistant. You can use tools to help the user. Be concise and direct.",
-    tools: [terminalTool, readFileTool, writeFileTool],
+    tools: allTools,
     maxIterations: 20,
   };
 
   const agent = new AgentLoop(config);
 
+  // Check memory status at startup
+  const memStats = await getMemoryStats();
+
   // Banner
   console.log(`\n${ANSI.bold}${ANSI.cyan}pi-agent-clone v0.1.0${ANSI.reset}`);
   console.log(`${ANSI.dim}Model: ${model.name} (${model.provider}) | Type your message, Ctrl+C to exit${ANSI.reset}`);
-  console.log(`${ANSI.dim}Tools: ${config.tools!.map((t) => t.definition.name).join(", ")}${ANSI.reset}\n`);
+  console.log(`${ANSI.dim}Tools: ${allTools.map((t) => t.definition.name).join(", ")}${ANSI.reset}`);
+  console.log(`${ANSI.magenta}Memory: ${memStats.entries} entries (${memStats.path})${ANSI.reset}\n`);
 
   // REPL
   const rl = readline.createInterface({
@@ -199,7 +227,7 @@ async function main() {
 
       // Slash commands
       if (trimmed.startsWith("/")) {
-        handleSlashCommand(trimmed, agent, config);
+        await handleSlashCommand(trimmed, agent, config);
         prompt();
         return;
       }
@@ -251,13 +279,14 @@ function handleEvent(event: AgentEvent): void {
       process.stdout.write(`${ANSI.yellow}[tool: ${event.toolCall.name}]${ANSI.reset} `);
       break;
 
-    case "tool_call_result":
+    case "tool_call_result": {
       const preview = event.result.length > 200
         ? event.result.slice(0, 200) + "..."
         : event.result;
       const color = event.isError ? ANSI.red : ANSI.dim;
       process.stdout.write(`${color}${preview.replace(/\n/g, "\\n")}${ANSI.reset}\n`);
       break;
+    }
 
     case "error":
       process.stdout.write(`${ANSI.red}Error: ${event.error.message}${ANSI.reset}\n`);
@@ -271,11 +300,11 @@ function handleEvent(event: AgentEvent): void {
   }
 }
 
-function handleSlashCommand(cmd: string, agent: AgentLoop, config: AgentConfig): void {
+async function handleSlashCommand(cmd: string, agent: AgentLoop, config: AgentConfig): Promise<void> {
   const parts = cmd.split(/\s+/);
   switch (parts[0]) {
     case "/help":
-      console.log("Commands: /help, /model <name>, /reset, /exit, /history, /status");
+      console.log("Commands: /help, /model <name>, /reset, /exit, /history, /status, /memory");
       break;
 
     case "/model": {
@@ -291,8 +320,6 @@ function handleSlashCommand(cmd: string, agent: AgentLoop, config: AgentConfig):
     }
 
     case "/reset":
-      // Reset by creating a new agent loop with same config
-      // (messages are internal, just create a new instance)
       console.log("Conversation reset.");
       break;
 
@@ -314,7 +341,24 @@ function handleSlashCommand(cmd: string, agent: AgentLoop, config: AgentConfig):
       console.log(`Model: ${config.model.name} (${config.model.provider})`);
       console.log(`Messages: ${agent.getMessages().length}`);
       console.log(`Max iterations: ${config.maxIterations}`);
+      {
+        const stats = await getMemoryStats();
+        console.log(`Memory: ${stats.entries} entries (${stats.sizeBytes} bytes)`);
+      }
       break;
+
+    case "/memory": {
+      const stats = await getMemoryStats();
+      console.log(`${ANSI.magenta}Memory: ${stats.entries} entries${ANSI.reset}`);
+      console.log(`${ANSI.dim}Path: ${stats.path}${ANSI.reset}`);
+      const content = await formatMemoryForPrompt();
+      if (content) {
+        console.log(content);
+      } else {
+        console.log(`${ANSI.dim}(empty)${ANSI.reset}`);
+      }
+      break;
+    }
 
     default:
       console.log(`Unknown command: ${parts[0]}. Type /help for commands.`);
