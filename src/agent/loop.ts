@@ -8,6 +8,7 @@
 //   - Graceful abort handling
 //   - Error recovery
 //   - Context window protection (80% threshold)
+//   - SOUL.md injection into system prompt for agent personality/identity
 //   - MEMORY.md injection into system prompt for long-term memory
 //   - Provider/model info injection into system prompt
 // ============================================================================
@@ -27,6 +28,7 @@ import type {
 import { getTransportForModel } from "../provider/registry.js";
 import { trimMessages, getContextInfo } from "../context/index.js";
 import { formatMemoryForPrompt } from "../memory/index.js";
+import { formatSoulForPrompt } from "../soul/index.js";
 
 export class AgentLoop {
   private config: AgentConfig;
@@ -49,20 +51,39 @@ export class AgentLoop {
   }
 
   /**
-   * Build the system prompt, injecting provider/model info and MEMORY.md content.
+   * Build the system prompt, injecting SOUL.md, provider/model info, and MEMORY.md content.
    * The prompt structure:
    *   1. Base system prompt (from config)
-   *   2. Provider/model info section
-   *   3. Memory section (if MEMORY.md has entries)
-   *   4. Memory usage instructions
+   *   2. SOUL.md section (agent's personality and identity)
+   *   3. Provider/model info section
+   *   4. MEMORY.md section (if MEMORY.md has entries)
+   *   5. Memory usage instructions
    */
   private async buildSystemPrompt(): Promise<string> {
     const basePrompt = this.config.systemPrompt || "You are a helpful AI assistant.";
     const model = this.config.model;
 
+    // Build SOUL.md section (agent's personality and identity)
+    const soulContent = await formatSoulForPrompt();
+    let soulSection = "";
+    if (soulContent) {
+      soulSection = [
+        "",
+        "══════════════════════════════════════════════",
+        "YOUR SOUL (Personality & Identity)",
+        "══════════════════════════════════════════════",
+        soulContent,
+        "══════════════════════════════════════════════",
+        "",
+        "The above entries define who you are as an AI assistant. They describe your personality,",
+        "communication style, values, and behavioral guidelines. Let these traits guide your responses.",
+        "You can evolve your soul using soul_write, soul_read, soul_search, and soul_remove tools.",
+        "",
+      ].join("\n");
+    }
+
     // Build provider/model info section
     const modelInfoSection = [
-      "",
       "══════════════════════════════════════════════",
       "CURRENT PROVIDER & MODEL",
       "══════════════════════════════════════════════",
@@ -81,7 +102,7 @@ export class AgentLoop {
     const memoryContent = await formatMemoryForPrompt();
 
     if (!memoryContent) {
-      return basePrompt + modelInfoSection;
+      return basePrompt + soulSection + modelInfoSection;
     }
 
     // Inject memory into system prompt
@@ -99,14 +120,14 @@ export class AgentLoop {
       "",
     ].join("\n");
 
-    return basePrompt + modelInfoSection + memorySection;
+    return basePrompt + soulSection + modelInfoSection + memorySection;
   }
 
   /**
-   * Invalidate the cached system prompt (called after memory changes).
-   * Next LLM call will rebuild the prompt with fresh memory content.
+   * Invalidate the cached system prompt (called after soul or memory changes).
+   * Next LLM call will rebuild the prompt with fresh soul and memory content.
    */
-  invalidateMemoryCache(): void {
+  invalidateSoulCache(): void {
     this.cachedSystemPrompt = null;
   }
 
@@ -128,7 +149,7 @@ export class AgentLoop {
       onEvent?.(event);
     };
 
-    // Build system prompt with memory injection (rebuilt each run)
+    // Build system prompt with soul and memory injection (rebuilt each run)
     let systemPrompt = await this.buildSystemPrompt();
 
     // Add user message to history
@@ -160,7 +181,7 @@ export class AgentLoop {
           emit({ type: "turn_start" });
         }
 
-        // Stream LLM response (use memory-injected system prompt)
+        // Stream LLM response (use soul/memory-injected system prompt)
         const assistantMessage = await this.streamResponse(emit, totalUsage, systemPrompt);
 
         // Check for errors or abort
@@ -188,8 +209,14 @@ export class AgentLoop {
         // Execute tool calls
         const toolResults = await this.executeToolCalls(toolCalls, emit);
 
-        // If memory was written/removed, rebuild system prompt for next turn
-        if (toolCalls.some((tc) => tc.name === "memory_write" || tc.name === "memory_remove")) {
+        // If soul or memory was written/removed, rebuild system prompt for next turn
+        const hasSoulChanges = toolCalls.some((tc) =>
+          tc.name === "soul_write" || tc.name === "soul_remove"
+        );
+        const hasMemoryChanges = toolCalls.some((tc) =>
+          tc.name === "memory_write" || tc.name === "memory_remove"
+        );
+        if (hasSoulChanges || hasMemoryChanges) {
           systemPrompt = await this.buildSystemPrompt();
         }
 
@@ -234,7 +261,7 @@ export class AgentLoop {
     const stream = transport.stream({
       model: this.config.model,
       messages: this.messages,
-      systemPrompt,  // Use memory-injected system prompt
+      systemPrompt,  // Use soul/memory-injected system prompt
       tools: this.config.tools?.map((t) => t.definition),
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,

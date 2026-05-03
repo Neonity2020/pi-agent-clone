@@ -2,48 +2,43 @@
 // Think Block Renderer — Detects and colorizes <think...</think reasoning blocks
 //
 // Some models (e.g., MiniMax M2.7) emit reasoning in <think...</think tags.
-// This module intercepts the streaming text delta, tracks state across chunks,
+// This module intercepts streaming text deltas, tracks state across chunks,
 // and applies dedicated ANSI colors to distinguish reasoning from normal output.
 //
-// Tag format is flexible:
-//   <think\n...content...\n</think\n     (MiniMax M2.7 style)
-//   <thinking>...content...</thinking>   (alternative style)
-//   <think ...>...content...</think       (with attributes)
+// Tag formats supported:
+//   <think\n...content...\n</think\n       (MiniMax M2.7 style — most common)
+//   <thinking>...content...</thinking>     (DeepSeek / alternative style)
+//   <think type="...">...content...</think  (attributes)
 //
 // Colors:
 //   - Think content: dim + cyan (subtle but readable)
-//   - Think tags: dim gray (visible but not distracting)
+//   - Think tags: hidden (stripped from output)
 // ============================================================================
-
-// ---- ANSI escape codes ------------------------------------------------------
 
 const ANSI = {
   reset:   "\x1b[0m",
   dim:     "\x1b[2m",
   cyan:    "\x1b[36m",
-  dimCyan: "\x1b[2m\x1b[36m",  // dim + cyan for think content
-  gray:    "\x1b[90m",          // gray for think tags
+  dimCyan: "\x1b[2m\x1b[36m",
+  gray:    "\x1b[90m",
 };
 
 /**
- * ThinkRenderer processes streaming text chunks and applies colors to
- * <think...</think reasoning blocks in real-time.
+ * ThinkRenderer processes streaming text chunks and colorizes <think...</think
+ * reasoning blocks in real-time.
  *
- * It maintains a small buffer to handle tags split across chunks,
- * and uses a simple state machine: NORMAL → IN_THINK → NORMAL.
+ * It tracks the full opening tag (e.g., "<think" or "<thinking") so that it
+ * can correctly match the corresponding closing tag (e.g., </think or </thinking).
  */
 export class ThinkRenderer {
-  // Parser state
   private inThink = false;
   private buffer = "";
-
-  // Tags to detect
-  private static readonly OPEN = "<think";
-  private static readonly CLOSE = "</think";
+  /** The full tag name we matched on open (e.g., "think" or "thinking") */
+  private openTagName = "";
 
   /**
    * Process an incoming text delta chunk.
-   * Returns a string (possibly with ANSI color codes) ready for stdout.write().
+   * Returns colored text ready for stdout.write().
    */
   process(chunk: string): string {
     let output = "";
@@ -51,62 +46,59 @@ export class ThinkRenderer {
 
     while (this.buffer.length > 0) {
       if (this.inThink) {
-        // ---- Inside think block: look for </think ----
-        const closeIdx = this.findTag(this.buffer, ThinkRenderer.CLOSE);
+        // ---- Inside think block: look for closing tag ----
+        const closeTag = `</${this.openTagName}`;
+        const closeIdx = this.buffer.indexOf(closeTag);
 
         if (closeIdx !== -1) {
           // Emit think content before closing tag (colored)
           output += this.colorThink(this.buffer.slice(0, closeIdx));
 
-          // Consume the closing tag + optional '>' after it
-          let end = closeIdx + ThinkRenderer.CLOSE.length;
+          // Consume closing tag + optional '>' + optional '\n'
+          let end = closeIdx + closeTag.length;
           if (end < this.buffer.length && this.buffer[end] === ">") end++;
-          // Also consume a trailing newline if present
           if (end < this.buffer.length && this.buffer[end] === "\n") end++;
 
           this.buffer = this.buffer.slice(end);
           this.inThink = false;
+          this.openTagName = "";
         } else {
-          // No closing tag yet — emit safe prefix, keep potential partial tag
-          const safe = this.safeEmitLength(ThinkRenderer.CLOSE);
+          // No closing tag yet — check if tail could be a partial close tag
+          const safe = this.safeEmitLength(closeTag);
           output += this.colorThink(this.buffer.slice(0, safe));
           this.buffer = this.buffer.slice(safe);
-          break; // Wait for more data
+          break;
         }
       } else {
-        // ---- Normal mode: look for <think opening ----
-        const openIdx = this.findTag(this.buffer, ThinkRenderer.OPEN);
+        // ---- Normal mode: look for <think or <thinking opening ----
+        const match = this.findOpenTag(this.buffer);
 
-        if (openIdx !== -1) {
+        if (match) {
           // Emit normal text before the tag
-          if (openIdx > 0) {
-            output += this.buffer.slice(0, openIdx);
+          if (match.index > 0) {
+            output += this.buffer.slice(0, match.index);
           }
 
-          // Consume: <think + optional attributes + optional '>'
-          let end = openIdx + ThinkRenderer.OPEN.length;
-          // Skip any tag content until '>' or whitespace
-          while (end < this.buffer.length && this.buffer[end] !== ">" && this.buffer[end] !== "\n" && this.buffer[end] !== " ") {
+          // Track the tag name for correct closing
+          this.openTagName = match.tagName;
+
+          // Consume: <tagName + optional attrs + optional '>' + optional '\n'
+          let end = match.index + match.fullMatch.length;
+          // Skip any attributes (everything until '>' or '\n')
+          while (end < this.buffer.length && this.buffer[end] !== ">" && this.buffer[end] !== "\n") {
             end++;
           }
-          // Skip to end of tag attributes if ' ' found (e.g., <think type="reasoning">)
-          if (end < this.buffer.length && this.buffer[end] === " ") {
-            const gtIdx = this.buffer.indexOf(">", end);
-            if (gtIdx !== -1) end = gtIdx + 1;
-          }
-          // Consume '>' if present
           if (end < this.buffer.length && this.buffer[end] === ">") end++;
-          // Consume trailing newline
           if (end < this.buffer.length && this.buffer[end] === "\n") end++;
 
           this.buffer = this.buffer.slice(end);
           this.inThink = true;
         } else {
-          // No opening tag — emit safe prefix, keep potential partial tag
-          const safe = this.safeEmitLength(ThinkRenderer.OPEN);
+          // No opening tag — emit safe prefix
+          const safe = this.safeEmitLength("<think");
           output += this.buffer.slice(0, safe);
           this.buffer = this.buffer.slice(safe);
-          if (this.buffer.length > 0) break; // Partial tag — wait
+          if (this.buffer.length > 0) break;
         }
       }
     }
@@ -128,22 +120,58 @@ export class ThinkRenderer {
     if (this.inThink) {
       output += ANSI.reset;
       this.inThink = false;
+      this.openTagName = "";
     }
     return output;
+  }
+
+  /** Whether we're currently inside a think block */
+  isInThink(): boolean {
+    return this.inThink;
   }
 
   /** Reset state for a new message. */
   reset(): void {
     this.inThink = false;
     this.buffer = "";
+    this.openTagName = "";
   }
 
   /**
-   * Find a tag in the buffer. Returns the start index or -1.
-   * Handles the case where the tag might not have '>' at the end.
+   * Find an opening think tag in the buffer.
+   * Returns the index, full matched string, and extracted tag name.
+   * Supports: <think, <thinking, <think attr="...">
    */
-  private findTag(buf: string, tag: string): number {
-    return buf.indexOf(tag);
+  private findOpenTag(buf: string): { index: number; fullMatch: string; tagName: string } | null {
+    // Try <think first (most common)
+    // We need to match <think followed by: >, \n, space, or end-of-buffer
+    // Also support <thinking (longer variant)
+    
+    const patterns = [
+      /<think(?=ing|\s|>|\n|$)/i,
+    ];
+
+    for (const pat of patterns) {
+      const m = buf.match(pat);
+      if (m && m.index !== undefined) {
+        // Determine the actual tag name
+        const fullMatch = m[0]; // "<think"
+        let tagName = "think";
+
+        // Check if it's <thinking
+        if (buf.slice(m.index! + 1).startsWith("thinking") &&
+            (buf.length <= m.index! + 9 || /[>\s\n]/.test(buf[m.index! + 9]))) {
+          tagName = "thinking";
+        }
+
+        return {
+          index: m.index,
+          fullMatch: "<" + tagName.slice(0, tagName === "thinking" ? 8 : 5),
+          tagName,
+        };
+      }
+    }
+    return null;
   }
 
   /**
@@ -151,16 +179,16 @@ export class ThinkRenderer {
    * without cutting a partial tag at the end?
    */
   private safeEmitLength(tag: string): number {
-    const tagLen = tag.length;
-    if (this.buffer.length <= tagLen) return 0;
-
-    // Check if the tail of buffer could be a partial match of the tag
-    for (let overlap = Math.min(tagLen - 1, this.buffer.length - 1); overlap >= 1; overlap--) {
-      const tail = this.buffer.slice(-overlap);
-      if (tag.startsWith(tail)) {
-        return this.buffer.length - overlap;
-      }
+    const lastLt = this.buffer.lastIndexOf("<");
+    if (lastLt === -1) {
+      return this.buffer.length;
     }
+
+    const tail = this.buffer.slice(lastLt);
+    if (tag.startsWith(tail)) {
+      return lastLt;
+    }
+
     return this.buffer.length;
   }
 

@@ -11,24 +11,47 @@
 import type { Interface as ReadlineInterface } from "readline";
 import type { AgentLoop } from "../../agent/loop.js";
 import type { AgentConfig } from "../../types.js";
+import { chalk } from "../markdown.js";
 
-// ---- ANSI (shared across commands) ----------------------------------------
+// ---- Chalk shortcuts (shared across commands) ------------------------------
 
+export const c = {
+  reset:    chalk.reset,
+  bold:     chalk.bold,
+  dim:      chalk.dim,
+  italic:   chalk.italic,
+  green:    chalk.green,
+  yellow:   chalk.yellow,
+  blue:     chalk.blue,
+  cyan:     chalk.cyan,
+  red:      chalk.red,
+  gray:     chalk.gray,
+  magenta:  chalk.magenta,
+  white:    chalk.white,
+  bgBlue:   chalk.bgBlue,
+  success:  chalk.bold.green,
+  error:    chalk.bold.red,
+  warning:  chalk.bold.yellow,
+  info:     chalk.bold.cyan,
+  muted:    chalk.dim.gray,
+};
+
+// Keep backward compat — ANSI is now a proxy to chalk
 export const ANSI = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  italic: "\x1b[3m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-  red: "\x1b[31m",
-  gray: "\x1b[90m",
-  magenta: "\x1b[35m",
-  white: "\x1b[37m",
-  bgBlue: "\x1b[44m",
-  bgCyan: "\x1b[46m",
+  reset:   "",
+  bold:    "",
+  dim:     "",
+  italic:  "",
+  green:   "",
+  yellow:  "",
+  blue:    "",
+  cyan:    "",
+  red:     "",
+  gray:    "",
+  magenta: "",
+  white:   "",
+  bgBlue:  "",
+  bgCyan:  "",
 };
 
 // ---- Command context: everything a command handler might need -------------
@@ -115,28 +138,47 @@ const CATEGORY_LABELS: Record<CommandCategory, string> = {
   info:    "Info",
 };
 
+const CATEGORY_ICONS: Record<CommandCategory, string> = {
+  session: "⚡",
+  config:  "⚙",
+  memory:  "🧠",
+  info:    "ℹ",
+};
+
 export function formatHelp(): string {
   const lines: string[] = [];
   lines.push("");
-  lines.push(`${ANSI.bold}${ANSI.cyan}pi-agent-clone Commands${ANSI.reset}`);
+  lines.push(c.bold.cyan("  ╔══════════════════════════════════════╗"));
+  lines.push(c.bold.cyan("  ║") + c.bold.white("  Commands                            ") + c.bold.cyan("║"));
+  lines.push(c.bold.cyan("  ╚══════════════════════════════════════╝"));
   lines.push("");
 
   const byCategory = getCommandsByCategory();
   for (const [cat, cmds] of Object.entries(byCategory)) {
-    lines.push(`  ${ANSI.bold}${CATEGORY_LABELS[cat as CommandCategory]}:${ANSI.reset}`);
+    const icon = CATEGORY_ICONS[cat as CommandCategory] || "•";
+    lines.push(`  ${c.bold(`${icon} ${CATEGORY_LABELS[cat as CommandCategory]}:`)}`);
+
     for (const cmd of cmds) {
       const aliases = cmd.aliases?.length
-        ? ` (${cmd.aliases.map((a) => `/${a}`).join(", ")})`
+        ? ` ${c.dim(`(${cmd.aliases.map((a) => `/${a}`).join(", ")})`)}`
         : "";
-      const usage = cmd.usage ? ` ${cmd.usage}` : "";
+      const usage = cmd.usage ? ` ${c.dim(cmd.usage)}` : "";
       lines.push(
-        `    ${ANSI.green}/${cmd.name}${ANSI.reset}${ANSI.dim}${usage}${ANSI.reset}` +
-        `${ANSI.gray}${aliases}${ANSI.reset}`,
+        `    ${c.green(`/${cmd.name}`)}${usage}${aliases}`,
       );
-      lines.push(`      ${ANSI.dim}${cmd.description}${ANSI.reset}`);
+      lines.push(`      ${c.dim(cmd.description)}`);
     }
     lines.push("");
   }
+
+  // Built-in commands (not in registry)
+  lines.push(`  ${c.bold("⚡ Built-in:")}`);
+  lines.push(`    ${c.green("/reset")} ${c.dim("─ Clear conversation history")}`);
+  lines.push(`    ${c.green("/exit")}  ${c.gray(`(/quit, /q)`)} ${c.dim("─ Exit the agent")}`);
+  lines.push(`    ${c.green("/history")}       ${c.dim("─ Show conversation history")}`);
+  lines.push(`    ${c.green("/memory")}        ${c.dim("─ Show memory contents")}`);
+  lines.push(`    ${c.green("/status")}        ${c.dim("─ Show agent status")}`);
+  lines.push("");
 
   return lines.join("\n");
 }

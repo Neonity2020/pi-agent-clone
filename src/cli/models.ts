@@ -3,6 +3,7 @@
 // ============================================================================
 
 import type { Model, ProviderName } from "../types.js";
+import { chalk } from "./markdown.js";
 
 export const MODELS: Record<string, Model> = {
   // ---- OpenAI ----
@@ -95,13 +96,13 @@ export const MODELS: Record<string, Model> = {
   },
 };
 
-/** Provider display info */
-export const PROVIDER_INFO: Record<ProviderName, { label: string; color: string; envKey: string }> = {
-  openai:    { label: "OpenAI",    color: "\x1b[32m",  envKey: "OPENAI_API_KEY" },
-  anthropic: { label: "Anthropic", color: "\x1b[35m",  envKey: "ANTHROPIC_API_KEY" },
-  gemini:    { label: "Gemini",    color: "\x1b[34m",  envKey: "GEMINI_API_KEY" },
-  glm:       { label: "GLM/智谱",  color: "\x1b[36m",  envKey: "GLM_API_KEY" },
-  minimax:   { label: "MiniMax",   color: "\x1b[33m",  envKey: "MINIMAX_API_KEY" },
+/** Provider display info — uses chalk color functions instead of raw ANSI */
+export const PROVIDER_INFO: Record<ProviderName, { label: string; colorFn: (text: string) => string; envKey: string }> = {
+  openai:    { label: "OpenAI",    colorFn: chalk.green,    envKey: "OPENAI_API_KEY" },
+  anthropic: { label: "Anthropic", colorFn: chalk.magenta,  envKey: "ANTHROPIC_API_KEY" },
+  gemini:    { label: "Gemini",    colorFn: chalk.blue,     envKey: "GEMINI_API_KEY" },
+  glm:       { label: "GLM/智谱",  colorFn: chalk.cyan,     envKey: "GLM_API_KEY" },
+  minimax:   { label: "MiniMax",   colorFn: chalk.yellow,   envKey: "MINIMAX_API_KEY" },
 };
 
 /** Get models grouped by provider */

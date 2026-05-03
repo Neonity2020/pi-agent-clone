@@ -10,6 +10,7 @@
 // ============================================================================
 
 import type { Interface as ReadlineInterface } from "readline";
+import { chalk } from "../markdown.js";
 
 export interface PickerItem {
   label: string;        // Primary display text
@@ -23,19 +24,19 @@ export interface PickerOptions {
   footer?: string;
 }
 
-// ---- ANSI helpers ----------------------------------------------------------
+// ---- Chalk shortcuts -------------------------------------------------------
 
 const C = {
-  reset:      "\x1b[0m",
-  bold:       "\x1b[1m",
-  dim:        "\x1b[2m",
-  green:      "\x1b[32m",
-  cyan:       "\x1b[36m",
-  yellow:     "\x1b[33m",
-  red:        "\x1b[31m",
+  reset:      chalk.reset,
+  bold:       chalk.bold,
+  dim:        chalk.dim,
+  green:      chalk.green,
+  cyan:       chalk.cyan,
+  yellow:     chalk.yellow,
+  red:        chalk.red,
   hideCursor: "\x1b[?25l",
   showCursor: "\x1b[?25h",
-  clearBelow: "\x1b[J",        // Erase from cursor to end of screen
+  clearBelow: "\x1b[J",
   moveUp:     (n: number) => `\x1b[${n}A`,
 };
 
@@ -43,7 +44,7 @@ const C = {
 
 const KEY_UP    = "\x1b[A";
 const KEY_DOWN  = "\x1b[B";
-const KEY_ENTER = "\r";         // Also \n in some terminals
+const KEY_ENTER = "\r";
 const KEY_CTRLC = "\x03";
 const KEY_ESC   = "\x1b";
 
@@ -55,29 +56,29 @@ function renderFrame(
   title: string,
   footer: string,
 ): string {
-  const lines: string[] = ["", `  ${C.bold}${C.cyan}${title}${C.reset}`, ""];
+  const lines: string[] = ["", `  ${C.bold.cyan(title)}`, ""];
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const active = i === selected;
 
     if (active) {
-      const cursor = `${C.bold}${C.green}❯${C.reset}`;
-      const label = `${C.bold}${C.cyan}${item.label}${C.reset}`;
+      const cursor = C.bold.green("❯");
+      const label = C.bold.cyan(item.label);
       let line = `    ${cursor} ${label}`;
-      if (item.detail) line += `  ${C.dim}${item.detail}${C.reset}`;
-      if (item.badge)  line += `  ${C.yellow}${item.badge}${C.reset}`;
+      if (item.detail) line += `  ${C.dim(item.detail)}`;
+      if (item.badge)  line += `  ${C.yellow(item.badge)}`;
       lines.push(line);
     } else {
       let line = `      ${item.label}`;
-      if (item.detail) line += `  ${C.dim}${item.detail}${C.reset}`;
-      if (item.badge)  line += `  ${C.dim}${item.badge}${C.reset}`;
+      if (item.detail) line += `  ${C.dim(item.detail)}`;
+      if (item.badge)  line += `  ${C.dim(item.badge)}`;
       lines.push(line);
     }
   }
 
   lines.push("");
-  lines.push(`  ${C.dim}${footer}${C.reset}`);
+  lines.push(`  ${C.dim(footer)}`);
 
   return lines.join("\n");
 }
@@ -90,11 +91,6 @@ function renderFrame(
  * - ↑/↓ or j/k: navigate
  * - Enter:       select
  * - Ctrl+C/Esc:  cancel
- *
- * @param items   List of selectable items
- * @param options Title and footer text
- * @param rl      Optional readline interface to pause/resume around raw mode
- * @returns       Selected item, or null if cancelled
  */
 export async function pick(
   items: PickerItem[],
@@ -103,7 +99,7 @@ export async function pick(
 ): Promise<PickerItem | null> {
   // Edge case: empty list
   if (items.length === 0) {
-    console.log(`  ${C.dim}(no items)${C.reset}`);
+    console.log(`  ${C.dim("(no items)")}`);
     return null;
   }
 
@@ -113,7 +109,7 @@ export async function pick(
     items.forEach((item, i) => {
       console.log(`    ${i + 1}. ${item.label}${item.detail ? `  ${item.detail}` : ""}`);
     });
-    console.log(`  ${C.dim}(non-interactive mode, selecting first item)${C.reset}`);
+    console.log(`  ${C.dim("(non-interactive mode, selecting first item)")}`);
     return items[0];
   }
 
@@ -171,7 +167,6 @@ export async function pick(
             return;
 
           default:
-            // Ignore other keys
             return;
         }
 

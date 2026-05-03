@@ -23,7 +23,7 @@ import {
   formatTokens,
   formatCost,
 } from "../models.js";
-import { ANSI, registerCommand, type CommandContext } from "./registry.js";
+import { c, registerCommand, type CommandContext } from "./registry.js";
 import { pick, type PickerItem } from "./picker.js";
 
 // ---- Subcommand dispatch ---------------------------------------------------
@@ -59,8 +59,8 @@ async function handleModel(ctx: CommandContext): Promise<void> {
       return;
     }
 
-    console.log(`  ${ANSI.red}Unknown: ${sub}${ANSI.reset}`);
-    console.log(`  ${ANSI.dim}Use /model for interactive selection, /model list to see all.${ANSI.reset}`);
+    console.log(`  ${c.error(`Unknown: ${sub}`)}`);
+    console.log(`  ${c.dim("Use /model for interactive selection, /model list to see all.")}`);
     return;
   }
 
@@ -100,7 +100,7 @@ async function interactivePicker(ctx: CommandContext): Promise<void> {
   }, ctx.rl);
 
   if (!selectedProvider) {
-    console.log(`  ${ANSI.dim}Cancelled.${ANSI.reset}`);
+    console.log(`  ${c.dim("Cancelled.")}`);
     return;
   }
 
@@ -108,7 +108,7 @@ async function interactivePicker(ctx: CommandContext): Promise<void> {
   const models = grouped[providerName] ?? [];
 
   if (models.length === 0) {
-    console.log(`  ${ANSI.dim}No models available for ${selectedProvider.label}.${ANSI.reset}`);
+    console.log(`  ${c.dim(`No models available for ${selectedProvider.label}.`)}`);
     return;
   }
 
@@ -140,7 +140,7 @@ async function interactivePicker(ctx: CommandContext): Promise<void> {
   }, ctx.rl);
 
   if (!selectedModel) {
-    console.log(`  ${ANSI.dim}Cancelled.${ANSI.reset}`);
+    console.log(`  ${c.dim("Cancelled.")}`);
     return;
   }
 
@@ -153,10 +153,10 @@ async function interactivePicker(ctx: CommandContext): Promise<void> {
 function switchModel(ctx: CommandContext, model: Model): void {
   ctx.config.model = model;
   console.log(
-    `  ${ANSI.green}${ANSI.bold}✓${ANSI.reset} Switched to ` +
-    `${ANSI.bold}${model.name}${ANSI.reset} ` +
-    `${ANSI.dim}(${model.provider} | ${formatTokens(model.contextWindow)} ctx | ` +
-    `${formatTokens(model.maxTokens)} out)${ANSI.reset}`,
+    `  ${c.success("✓")} Switched to ` +
+    `${c.bold(model.name)} ` +
+    c.dim(`(${model.provider} | ${formatTokens(model.contextWindow)} ctx | ` +
+    `${formatTokens(model.maxTokens)} out)`),
   );
 }
 
@@ -182,34 +182,35 @@ async function showList(ctx: CommandContext): Promise<void> {
   const currentId = ctx.config.model.id;
 
   console.log("");
-  console.log(`  ${ANSI.bold}Available Models${ANSI.reset}`);
-  console.log(`  ${ANSI.dim}──────────────────────────────────────────────────────────────────${ANSI.reset}`);
+  console.log(`  ${c.bold.cyan("Available Models")}`);
+  console.log(`  ${c.dim("─".repeat(60))}`);
 
   for (const [provider, models] of Object.entries(grouped)) {
     const info = PROVIDER_INFO[provider as ProviderName];
     const label = info?.label || provider;
-    const color = info?.color || "";
+    // Provider color from hex (map provider to chalk color)
+    const providerColor = getProviderColor(provider);
 
-    console.log(`\n  ${color}${ANSI.bold}${label}${ANSI.reset}`);
+    console.log(`\n  ${c.bold(providerColor(label))}`);
 
     for (const m of models) {
       const marker = m.id === currentId
-        ? `  ${ANSI.green}◀ current${ANSI.reset}`
+        ? `  ${c.success("◀ current")}`
         : "";
       const cost = m.cost
-        ? `  ${ANSI.dim}${formatCost(m.cost)}/1M${ANSI.reset}`
+        ? `  ${c.dim(`${formatCost(m.cost)}/1M`)}`
         : "";
       console.log(
-        `    ${ANSI.green}${m.id.padEnd(28)}${ANSI.reset}` +
+        `    ${c.cyan(m.id.padEnd(28))}` +
         `${m.name.padEnd(18)}` +
-        `${ANSI.dim}${formatTokens(m.contextWindow).padStart(7)} ctx${ANSI.reset}` +
+        `${c.dim(`${formatTokens(m.contextWindow).padStart(7)} ctx`)}` +
         `${cost}${marker}`,
       );
     }
   }
 
   console.log("");
-  console.log(`  ${ANSI.dim}Switch with: /model <id> or /model for interactive selection${ANSI.reset}`);
+  console.log(`  ${c.dim("Switch with: /model <id> or /model for interactive selection")}`);
   console.log("");
 }
 
@@ -219,18 +220,19 @@ async function showProviderModels(provider: string, ctx: CommandContext): Promis
   const grouped = getModelsByProvider();
   const models = grouped[provider as ProviderName];
   if (!models) {
-    console.log(`  ${ANSI.red}No models for provider: ${provider}${ANSI.reset}`);
+    console.log(`  ${c.error(`No models for provider: ${provider}`)}`);
     return;
   }
 
   const info = PROVIDER_INFO[provider as ProviderName];
+  const providerColor = getProviderColor(provider);
   console.log("");
-  console.log(`  ${(info?.color || "")}${ANSI.bold}${info?.label || provider}${ANSI.reset} models:`);
+  console.log(`  ${c.bold(providerColor(info?.label || provider))} ${c.dim("models:")}`);
   for (const m of models) {
-    const marker = m.id === ctx.config.model.id ? `  ${ANSI.green}◀${ANSI.reset}` : "";
-    console.log(`    ${ANSI.green}${m.id}${ANSI.reset} — ${m.name}${marker}`);
+    const marker = m.id === ctx.config.model.id ? `  ${c.success("◀")}` : "";
+    console.log(`    ${c.cyan(m.id)} ${c.dim("─")} ${m.name}${marker}`);
   }
-  console.log(`  ${ANSI.dim}Switch with: /model <id>${ANSI.reset}`);
+  console.log(`  ${c.dim("Switch with: /model <id>")}`);
   console.log("");
 }
 
@@ -238,22 +240,38 @@ async function showProviderModels(provider: string, ctx: CommandContext): Promis
 
 async function showProviders(ctx: CommandContext): Promise<void> {
   console.log("");
-  console.log(`  ${ANSI.bold}Providers${ANSI.reset}`);
-  console.log(`  ${ANSI.dim}──────────────────────────────────${ANSI.reset}`);
+  console.log(`  ${c.bold.cyan("Providers")}`);
+  console.log(`  ${c.dim("─".repeat(40))}`);
 
   for (const [provider, info] of Object.entries(PROVIDER_INFO)) {
     const hasKey = !!process.env[info.envKey];
-    const keyIcon = hasKey ? `${ANSI.green}✓${ANSI.reset}` : `${ANSI.red}✗${ANSI.reset}`;
+    const keyIcon = hasKey ? c.success("✓") : c.error("✗");
     const models = getModelsByProvider()[provider as ProviderName] ?? [];
+    const providerColor = getProviderColor(provider);
     console.log(
-      `  ${info.color}${ANSI.bold}${info.label.padEnd(12)}${ANSI.reset} ` +
-      `${keyIcon} ${ANSI.dim}${info.envKey}${ANSI.reset} ` +
-      `${ANSI.dim}(${models.length} models)${ANSI.reset}`,
+      `  ${c.bold(providerColor(info.label.padEnd(12)))} ` +
+      `${keyIcon} ${c.dim(info.envKey)} ` +
+      `${c.dim(`(${models.length} models)`)}`,
     );
   }
 
   console.log("");
 }
+
+// ---- Provider color helper -------------------------------------------------
+
+function getProviderColor(provider: string): (text: string) => string {
+  const colors: Record<string, (text: string) => string> = {
+    openai:    chalk.green,
+    anthropic: chalk.magenta,
+    gemini:    chalk.blue,
+    glm:       chalk.cyan,
+    minimax:   chalk.yellow,
+  };
+  return colors[provider] || chalk.white;
+}
+
+import { chalk } from "../markdown.js";
 
 // ---- Register --------------------------------------------------------------
 
