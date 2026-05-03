@@ -1,19 +1,46 @@
 import { FeatureGrid } from '@/components/feature-grid';
 import { Hero } from '@/components/hero';
 
-export default function HomePage() {
+type HomePageProps = {
+  searchParams?: {
+    lang?: string;
+  };
+};
+
+const copy = {
+  en: {
+    footer: 'Crafted with Next.js 16.',
+    langLabel: '中文',
+  },
+  zh: {
+    footer: '基于 Next.js 16 构建。',
+    langLabel: 'English',
+  },
+} as const;
+
+export default function HomePage({ searchParams }: HomePageProps) {
+  const lang = searchParams?.lang === 'zh' ? 'zh' : 'en';
+  const content = copy[lang];
+
   return (
     <main className="container">
       <header className="topbar">
         <span className="brand">Pi-Agent Clone</span>
-        <a href="https://github.com/neonity2020/pi-agent-clone" className="repo-link" target="_blank" rel="noopener noreferrer">
-          GitHub
-        </a>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <a href={lang === 'zh' ? '/' : '/?lang=zh'} className="repo-link">
+            {content.langLabel}
+          </a>
+          <a href="https://github.com/neonity2020/pi-agent-clone" className="repo-link" target="_blank" rel="noopener noreferrer">
+            GitHub
+          </a>
+        </div>
       </header>
-      <Hero />
-      <FeatureGrid />
+      <Hero lang={lang} />
+      <FeatureGrid lang={lang} />
       <footer className="footer">
-        <p>© {new Date().getFullYear()} Pi-Agent Clone. Crafted with Next.js 16.</p>
+        <p>
+          © {new Date().getFullYear()} Pi-Agent Clone. {content.footer}
+        </p>
       </footer>
     </main>
   );
