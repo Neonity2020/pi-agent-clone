@@ -7,8 +7,12 @@ export function Hero() {
         Pi-Agent Clone helps you plan, edit, run, and ship code with support for leading LLM providers.
       </p>
       <div className="actions">
-        <a href="https://github.com" className="btn btn-primary">Get Started</a>
-        <a href="#features" className="btn btn-ghost">Explore Features</a>
+        <a href="https://github.com/neonity2020/pi-agent-clone" className="btn btn-primary" target="_blank" rel="noopener noreferrer">
+          Get Started
+        </a>
+        <a href="#features" className="btn btn-ghost">
+          Explore Features
+        </a>
       </div>
     </section>
   );

@@ -6,7 +6,9 @@ export default function HomePage() {
     <main className="container">
       <header className="topbar">
         <span className="brand">Pi-Agent Clone</span>
-        <a href="https://github.com" className="repo-link">GitHub</a>
+        <a href="https://github.com/neonity2020/pi-agent-clone" className="repo-link" target="_blank" rel="noopener noreferrer">
+          GitHub
+        </a>
       </header>
       <Hero />
       <FeatureGrid />
