@@ -9,6 +9,7 @@
 //   - Error recovery
 //   - Context window protection (80% threshold)
 //   - MEMORY.md injection into system prompt for long-term memory
+//   - Provider/model info injection into system prompt
 // ============================================================================
 
 import type {
@@ -48,25 +49,43 @@ export class AgentLoop {
   }
 
   /**
-   * Build the system prompt, injecting MEMORY.md content if available.
+   * Build the system prompt, injecting provider/model info and MEMORY.md content.
    * The prompt structure:
    *   1. Base system prompt (from config)
-   *   2. Memory section (if MEMORY.md has entries)
-   *   3. Memory usage instructions
+   *   2. Provider/model info section
+   *   3. Memory section (if MEMORY.md has entries)
+   *   4. Memory usage instructions
    */
   private async buildSystemPrompt(): Promise<string> {
     const basePrompt = this.config.systemPrompt || "You are a helpful AI assistant.";
+    const model = this.config.model;
+
+    // Build provider/model info section
+    const modelInfoSection = [
+      "",
+      "══════════════════════════════════════════════",
+      "CURRENT PROVIDER & MODEL",
+      "══════════════════════════════════════════════",
+      `Provider: ${model.provider}`,
+      `Model: ${model.name} (${model.id})`,
+      `API mode: ${model.api}`,
+      `Context window: ${model.contextWindow} tokens`,
+      `Max output: ${model.maxTokens} tokens`,
+      "══════════════════════════════════════════════",
+      "",
+      "You are currently running on the above provider and model. You can mention this information if the user asks about your identity.",
+      "",
+    ].join("\n");
 
     // Read memory entries
     const memoryContent = await formatMemoryForPrompt();
 
     if (!memoryContent) {
-      return basePrompt;
+      return basePrompt + modelInfoSection;
     }
 
     // Inject memory into system prompt
     const memorySection = [
-      "",
       "══════════════════════════════════════════════",
       "LONG-TERM MEMORY (persistent across sessions)",
       "══════════════════════════════════════════════",
@@ -80,7 +99,7 @@ export class AgentLoop {
       "",
     ].join("\n");
 
-    return basePrompt + memorySection;
+    return basePrompt + modelInfoSection + memorySection;
   }
 
   /**

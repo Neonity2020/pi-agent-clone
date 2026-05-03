@@ -20,91 +20,15 @@ import {
   memoryRemoveTool,
 } from "../tool/index.js";
 import { getMemoryStats, formatMemoryForPrompt } from "../memory/index.js";
-import type { AgentConfig, AgentEvent, Model, ProviderName } from "../types.js";
-
-// ---- Built-in models -------------------------------------------------------
-
-const MODELS: Record<string, Model> = {
-  "gpt-4o": {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    provider: "openai",
-    api: "openai",
-    contextWindow: 128000,
-    maxTokens: 16384,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-    cost: { inputPerMillion: 2.5, outputPerMillion: 10 },
-  },
-  "gpt-4o-mini": {
-    id: "gpt-4o-mini",
-    name: "GPT-4o Mini",
-    provider: "openai",
-    api: "openai",
-    contextWindow: 128000,
-    maxTokens: 16384,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-    cost: { inputPerMillion: 0.15, outputPerMillion: 0.6 },
-  },
-  "claude-sonnet-4-20250514": {
-    id: "claude-sonnet-4-20250514",
-    name: "Claude Sonnet 4",
-    provider: "anthropic",
-    api: "anthropic",
-    contextWindow: 200000,
-    maxTokens: 16384,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-    cost: { inputPerMillion: 3, outputPerMillion: 15 },
-  },
-  "gemini-2.5-flash": {
-    id: "gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
-    provider: "gemini",
-    api: "gemini",
-    contextWindow: 1000000,
-    maxTokens: 65536,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-    cost: { inputPerMillion: 0.15, outputPerMillion: 0.6 },
-  },
-  "glm-5.1": {
-    id: "glm-5.1",
-    name: "GLM-5.1",
-    provider: "glm",
-    api: "openai",
-    baseUrl: "https://open.bigmodel.cn/api/coding/paas/v4",
-    contextWindow: 128000,
-    maxTokens: 4096,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-    cost: { inputPerMillion: 0.05, outputPerMillion: 0.05 },
-  },
-  "glm-4.7": {
-    id: "glm-4.7",
-    name: "GLM-4.7",
-    provider: "glm",
-    api: "openai",
-    baseUrl: "https://open.bigmodel.cn/api/coding/paas/v4",
-    contextWindow: 128000,
-    maxTokens: 4096,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-    cost: { inputPerMillion: 0.0001, outputPerMillion: 0.0001 },
-  },
-  "MiniMax-M2.7": {
-    id: "MiniMax-M2.7",
-    name: "MiniMax M2.7",
-    provider: "minimax",
-    api: "openai",
-    baseUrl: "https://api.minimax.chat/v1",
-    contextWindow: 1000000,
-    maxTokens: 16384,
-    supportsStreaming: true,
-    supportsToolCalling: true,
-  },
-};
+import { MODELS } from "./models.js";
+import {
+  ANSI,
+  resolveCommand,
+  formatHelp,
+  type CommandContext,
+} from "./commands/index.js";
+import { ThinkRenderer } from "./think-render.js";
+import type { AgentConfig, AgentEvent } from "../types.js";
 
 // ---- Parse CLI args --------------------------------------------------------
 
@@ -122,7 +46,7 @@ function parseArgs(): { model: string; provider?: string } {
       console.log(`
 pi-agent-clone v0.1.0 — AI coding agent with long-term memory
 
-Usage: pi-clone [options]
+Usage: pi-agent [options]
 
 Options:
   -m, --model <name>     Model to use (default: glm-4-flash)
@@ -155,20 +79,62 @@ Long-term memory:
   return { model, provider };
 }
 
-// ---- ANSI helpers ----------------------------------------------------------
+// ---- Built-in slash commands (non-registry) --------------------------------
+// These are session-control commands that don't fit the CommandContext pattern
 
-const ANSI = {
-  reset: "\x1b[0m",
-  bold: "\x1b[1m",
-  dim: "\x1b[2m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-  red: "\x1b[31m",
-  gray: "\x1b[90m",
-  magenta: "\x1b[35m",
-};
+function handleBuiltinCommand(cmd: string, agent: AgentLoop, config: AgentConfig): boolean {
+  const parts = cmd.split(/\s+/);
+
+  switch (parts[0]) {
+    case "/reset":
+      console.log("Conversation reset.");
+      return true;
+
+    case "/exit":
+    case "/quit":
+    case "/q":
+      process.exit(0);
+
+    case "/history": {
+      const msgs = agent.getMessages();
+      for (const msg of msgs) {
+        const role = msg.role === "tool_result" ? "tool" : msg.role;
+        const content = msg.role === "assistant" ? msg.content.slice(0, 100) : ("content" in msg ? (msg as any).content?.slice(0, 100) : "");
+        console.log(`  ${ANSI.dim}[${role}] ${content}...${ANSI.reset}`);
+      }
+      return true;
+    }
+
+    case "/memory": {
+      (async () => {
+        const stats = await getMemoryStats();
+        console.log(`${ANSI.magenta}Memory: ${stats.entries} entries${ANSI.reset}`);
+        console.log(`${ANSI.dim}Path: ${stats.path}${ANSI.reset}`);
+        const content = await formatMemoryForPrompt();
+        if (content) {
+          console.log(content);
+        } else {
+          console.log(`${ANSI.dim}(empty)${ANSI.reset}`);
+        }
+      })();
+      return true;
+    }
+
+    case "/status": {
+      (async () => {
+        console.log(`Model: ${config.model.name} (${config.model.provider})`);
+        console.log(`Messages: ${agent.getMessages().length}`);
+        console.log(`Max iterations: ${config.maxIterations}`);
+        const stats = await getMemoryStats();
+        console.log(`Memory: ${stats.entries} entries (${stats.sizeBytes} bytes)`);
+      })();
+      return true;
+    }
+
+    default:
+      return false;
+  }
+}
 
 // ---- Main ------------------------------------------------------------------
 
@@ -209,7 +175,8 @@ async function main() {
   console.log(`\n${ANSI.bold}${ANSI.cyan}pi-agent-clone v0.1.0${ANSI.reset}`);
   console.log(`${ANSI.dim}Model: ${model.name} (${model.provider}) | Type your message, Ctrl+C to exit${ANSI.reset}`);
   console.log(`${ANSI.dim}Tools: ${allTools.map((t) => t.definition.name).join(", ")}${ANSI.reset}`);
-  console.log(`${ANSI.magenta}Memory: ${memStats.entries} entries (${memStats.path})${ANSI.reset}\n`);
+  console.log(`${ANSI.magenta}Memory: ${memStats.entries} entries (${memStats.path})${ANSI.reset}`);
+  console.log(`${ANSI.dim}Type /help for commands${ANSI.reset}\n`);
 
   // REPL
   const rl = readline.createInterface({
@@ -227,7 +194,34 @@ async function main() {
 
       // Slash commands
       if (trimmed.startsWith("/")) {
-        await handleSlashCommand(trimmed, agent, config);
+        // Try built-in commands first (session control)
+        if (handleBuiltinCommand(trimmed, agent, config)) {
+          prompt();
+          return;
+        }
+
+        // Try registry commands (/model, etc.)
+        const resolved = resolveCommand(trimmed);
+        if (resolved) {
+          const ctx: CommandContext = {
+            agent,
+            config,
+            rl,
+            rawInput: trimmed,
+            args: resolved.args,
+          };
+          try {
+            await resolved.cmd.execute(ctx);
+          } catch (err) {
+            console.error(`${ANSI.red}Command error: ${err instanceof Error ? err.message : err}${ANSI.reset}`);
+          }
+        } else if (trimmed === "/help") {
+          console.log(formatHelp());
+        } else {
+          console.log(`${ANSI.red}Unknown command: ${trimmed}${ANSI.reset}`);
+          console.log(`${ANSI.dim}Type /help for available commands${ANSI.reset}`);
+        }
+
         prompt();
         return;
       }
@@ -260,13 +254,28 @@ async function main() {
   prompt();
 }
 
+// ---- Think block renderer (stateful, persists per message) ------------------
+// Detects <think...</think reasoning blocks from models like MiniMax M2.7
+// and renders them with dedicated dim-cyan color for clarity.
+let thinkRenderer = new ThinkRenderer();
+
 function handleEvent(event: AgentEvent): void {
   switch (event.type) {
-    case "message_delta":
-      process.stdout.write(event.delta);
+    case "message_delta": {
+      // Process text through think renderer to colorize reasoning blocks
+      const rendered = thinkRenderer.process(event.delta);
+      process.stdout.write(rendered);
+      break;
+    }
+
+    case "message_start":
+      // Reset think renderer for each new assistant message
+      thinkRenderer.reset();
       break;
 
     case "message_done":
+      // Flush any remaining buffered content
+      process.stdout.write(thinkRenderer.flush());
       process.stdout.write("\n");
       if (event.message.usage) {
         process.stdout.write(
@@ -297,71 +306,6 @@ function handleEvent(event: AgentEvent): void {
         process.stdout.write(`${ANSI.yellow}[max iterations reached]${ANSI.reset}\n`);
       }
       break;
-  }
-}
-
-async function handleSlashCommand(cmd: string, agent: AgentLoop, config: AgentConfig): Promise<void> {
-  const parts = cmd.split(/\s+/);
-  switch (parts[0]) {
-    case "/help":
-      console.log("Commands: /help, /model <name>, /reset, /exit, /history, /status, /memory");
-      break;
-
-    case "/model": {
-      const newModelId = parts[1];
-      const newModel = MODELS[newModelId];
-      if (newModel) {
-        config.model = newModel;
-        console.log(`Switched to ${newModel.name} (${newModel.provider})`);
-      } else {
-        console.log(`Unknown model. Available: ${Object.keys(MODELS).join(", ")}`);
-      }
-      break;
-    }
-
-    case "/reset":
-      console.log("Conversation reset.");
-      break;
-
-    case "/exit":
-    case "/quit":
-      process.exit(0);
-
-    case "/history": {
-      const msgs = agent.getMessages();
-      for (const msg of msgs) {
-        const role = msg.role === "tool_result" ? "tool" : msg.role;
-        const content = msg.role === "assistant" ? msg.content.slice(0, 100) : ("content" in msg ? (msg as any).content?.slice(0, 100) : "");
-        console.log(`  ${ANSI.dim}[${role}] ${content}...${ANSI.reset}`);
-      }
-      break;
-    }
-
-    case "/status":
-      console.log(`Model: ${config.model.name} (${config.model.provider})`);
-      console.log(`Messages: ${agent.getMessages().length}`);
-      console.log(`Max iterations: ${config.maxIterations}`);
-      {
-        const stats = await getMemoryStats();
-        console.log(`Memory: ${stats.entries} entries (${stats.sizeBytes} bytes)`);
-      }
-      break;
-
-    case "/memory": {
-      const stats = await getMemoryStats();
-      console.log(`${ANSI.magenta}Memory: ${stats.entries} entries${ANSI.reset}`);
-      console.log(`${ANSI.dim}Path: ${stats.path}${ANSI.reset}`);
-      const content = await formatMemoryForPrompt();
-      if (content) {
-        console.log(content);
-      } else {
-        console.log(`${ANSI.dim}(empty)${ANSI.reset}`);
-      }
-      break;
-    }
-
-    default:
-      console.log(`Unknown command: ${parts[0]}. Type /help for commands.`);
   }
 }
 
