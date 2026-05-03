@@ -293,3 +293,13 @@ MIT
 ---
 
 **[中文版 README](README_ZH.md)**
+
+## Official Website (Next.js 16)
+
+A modern, minimal official website is available in [`website/`](./website).
+
+```bash
+cd website
+npm install
+npm run dev
+```
