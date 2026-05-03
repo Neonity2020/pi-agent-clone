@@ -1,0 +1,17 @@
+{
+  "name": "example-config",
+  "version": "1.0.0",
+  "settings": {
+    "debug": true,
+    "timeout": 30000,
+    "retries": 3
+  },
+  "endpoints": {
+    "api": "https://api.example.com/v1",
+    "websocket": "wss://api.example.com/ws"
+  },
+  "features": {
+    "enableCaching": true,
+    "enableLogging": false
+  }
+}

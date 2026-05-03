@@ -1,0 +1,33 @@
+{
+  "description": "示例数据集 - 可用于测试和演示",
+  "version": "1.0.0",
+  "created": "2024-05-02",
+  "data": [
+    {
+      "id": 1,
+      "name": "Sample Item 1",
+      "category": "Type A",
+      "value": 100,
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Sample Item 2",
+      "category": "Type B",
+      "value": 200,
+      "active": false
+    },
+    {
+      "id": 3,
+      "name": "Sample Item 3",
+      "category": "Type A",
+      "value": 150,
+      "active": true
+    }
+  ],
+  "statistics": {
+    "total": 3,
+    "active": 2,
+    "averageValue": 150
+  }
+}
