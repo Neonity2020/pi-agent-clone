@@ -2,9 +2,9 @@ import { FeatureGrid } from '@/components/feature-grid';
 import { Hero } from '@/components/hero';
 
 type HomePageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     lang?: string;
-  };
+  }>;
 };
 
 const copy = {
@@ -18,8 +18,9 @@ const copy = {
   },
 } as const;
 
-export default function HomePage({ searchParams }: HomePageProps) {
-  const lang = searchParams?.lang === 'zh' ? 'zh' : 'en';
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const params = await searchParams;
+  const lang = params?.lang === 'zh' ? 'zh' : 'en';
   const content = copy[lang];
 
   return (
