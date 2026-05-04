@@ -231,20 +231,18 @@ async function main() {
   const memStats = await getMemoryStats();
 
   // ── Pretty banner ────────────────────────────────────────────────────────
-  const bannerLines = [
-    "",
-    c.bold.cyan("  ╔══════════════════════════════════════╗"),
-    c.bold.cyan("  ║") + c.bold.white("  pi-agent-clone v0.1.0                ") + c.bold.cyan("║"),
-    c.bold.cyan("  ╚══════════════════════════════════════╝"),
-    "",
-    `  ${c.cyan("Model:")}   ${c.bold(model.name)} ${c.dim(`(${model.provider})`)}`,
-    `  ${c.cyan("Tools:")}   ${c.dim(allTools.map((t) => t.definition.name).join(", "))}`,
-    `  ${c.cyan("Memory:")}  ${c.magenta(`${memStats.entries} entries`)} ${c.dim(memStats.path)}`,
-    "",
-    `  ${c.dim("Type your message · /help for commands · Ctrl+C to exit")}`,
-    "",
-  ];
-  console.log(bannerLines.join("\n"));
+  // Use simple ASCII to avoid alignment issues across different terminals
+  console.log("");
+  console.log(c.bold.cyan("  ╔══════════════════════════════════════╗"));
+  console.log(c.bold.cyan("  ║ ") + c.bold.white("pi-agent-clone v0.1.0") + c.bold.cyan("                ║"));
+  console.log(c.bold.cyan("  ╚══════════════════════════════════════╝"));
+  console.log("");
+  console.log(`  ${c.cyan("Model:")}   ${c.bold(model.name)} ${c.dim(`(${model.provider})`)}`);
+  console.log(`  ${c.cyan("Tools:")}   ${c.dim(allTools.map((t) => t.definition.name).join(", "))}`);
+  console.log(`  ${c.cyan("Memory:")}  ${c.magenta(`${memStats.entries} entries`)} ${c.dim(memStats.path)}`);
+  console.log("");
+  console.log(`  ${c.dim("Type your message · /help for commands · Ctrl+C to exit")}`);
+  console.log("");
 
   // REPL
   const rl = readline.createInterface({
