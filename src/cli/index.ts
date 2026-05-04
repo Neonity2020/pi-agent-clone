@@ -15,8 +15,20 @@
 //   - ThinkRenderer: <think...</think reasoning block detection + color
 // ============================================================================
 
-// Suppress punycode deprecation warning from openai SDK on Node.js 22+
-process.removeAllListeners("warning");
+// Suppress only the punycode deprecation warning from openai SDK on Node.js 22+
+// (Don't remove all warning listeners — that hides useful security/deprecation warnings)
+const _origEmit = process.emit.bind(process) as (event: string | symbol, ...args: any[]) => boolean;
+(process as any).emit = function (event: string | symbol, ...emitArgs: any[]): boolean {
+  if (
+    event === "warning" &&
+    emitArgs[0]?.name === "DeprecationWarning" &&
+    typeof emitArgs[0]?.message === "string" &&
+    emitArgs[0].message.includes("punycode")
+  ) {
+    return false; // Suppress this specific warning only
+  }
+  return _origEmit(event, ...emitArgs);
+};
 
 import "dotenv/config";
 import * as readline from "readline";

@@ -1,10 +1,16 @@
 // ============================================================================
-// Built-in tool: write_file — write content to a file
+// Built-in tool: write_file — write content to a file (with path sandboxing)
 // ============================================================================
 
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { ToolHandler } from "../types.js";
+import {
+  resolveSandboxedPath,
+  checkSensitivePath,
+  validateWriteSize,
+  validateStringArg,
+} from "../utils/security.js";
 
 export const writeFileTool: ToolHandler = {
   definition: {
@@ -29,15 +35,18 @@ export const writeFileTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const filePath = args.path as string;
-    const content = args.content as string;
-
-    if (!filePath) {
-      return "Error: path is required";
-    }
+    const filePath = validateStringArg(args.path, "path");
+    const content = validateStringArg(args.content, "content");
 
     try {
-      const resolved = path.resolve(filePath);
+      // Security: validate content size
+      validateWriteSize(content);
+
+      // Security: resolve and validate path is within sandbox
+      const resolved = resolveSandboxedPath(filePath);
+
+      // Security: warn about sensitive files
+      const sensitiveWarning = checkSensitivePath(resolved);
 
       // Create parent directories if they don't exist
       await fs.mkdir(path.dirname(resolved), { recursive: true });
@@ -47,8 +56,15 @@ export const writeFileTool: ToolHandler = {
 
       const lines = content.split("\n").length;
       const bytes = Buffer.byteLength(content, "utf-8");
-      return `Successfully wrote ${lines} lines (${bytes} bytes) to ${resolved}`;
+      let result = `Successfully wrote ${lines} lines (${bytes} bytes) to ${resolved}`;
+      if (sensitiveWarning) {
+        result = sensitiveWarning + "\n" + result;
+      }
+      return result;
     } catch (err: any) {
+      if (err.message?.startsWith("Security:")) {
+        return err.message;
+      }
       return `Error writing file: ${err.message}`;
     }
   },

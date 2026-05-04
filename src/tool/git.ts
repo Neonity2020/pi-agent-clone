@@ -1,8 +1,64 @@
 // ============================================================================
-// Built-in tool: git — execute Git commands
+// Built-in tool: git — execute Git commands (with proper argument parsing)
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
+import { validateStringArg, validateNumberArg } from "../utils/security.js";
+
+/**
+ * Parse a command string into an array of arguments, respecting quoted strings.
+ * e.g. 'commit -m "fix: hello world"' → ['commit', '-m', 'fix: hello world']
+ */
+function parseCommandString(input: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escaped = false;
+
+  for (const char of input) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      if (inDoubleQuote) {
+        escaped = true;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (char === " " && !inSingleQuote && !inDoubleQuote) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) {
+    args.push(current);
+  }
+
+  return args;
+}
 
 export const gitTool: ToolHandler = {
   definition: {
@@ -29,16 +85,19 @@ export const gitTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const gitCommand = args.command as string;
-    const timeout = ((args.timeout as number) || 60) * 1000;
+    const gitCommand = validateStringArg(args.command, "command");
+    const timeout = validateNumberArg(args.timeout ?? 60, "timeout", 1, 600) * 1000;
     const workdir = args.workdir as string | undefined;
 
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
 
+    // Security: parse command respecting quotes instead of naive split(" ")
+    const gitArgs = parseCommandString(gitCommand);
+
     try {
-      const { stdout, stderr } = await execFileAsync("git", gitCommand.split(" "), {
+      const { stdout, stderr } = await execFileAsync("git", gitArgs, {
         maxBuffer: 1024 * 1024 * 10, // 10MB for git output
         timeout,
         cwd: workdir,

@@ -355,12 +355,20 @@ export class AgentLoop {
         }
 
         try {
-          // Parse arguments
+          // Parse arguments — report malformed JSON instead of silently defaulting
           let args: Record<string, unknown>;
           try {
             args = JSON.parse(tc.arguments);
-          } catch {
-            args = {};
+          } catch (parseErr) {
+            const detail = parseErr instanceof Error ? parseErr.message : String(parseErr);
+            const errMsg = `Invalid JSON in tool arguments for "${tc.name}": ${detail}`;
+            emit({ type: "tool_call_result", toolCallId: tc.id, result: errMsg, isError: true });
+            return {
+              role: "tool_result" as const,
+              toolCallId: tc.id,
+              content: errMsg,
+              isError: true,
+            };
           }
 
           const result = await handler.execute(args);

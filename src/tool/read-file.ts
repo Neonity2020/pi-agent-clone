@@ -1,10 +1,16 @@
 // ============================================================================
-// Built-in tool: read_file — read file contents
+// Built-in tool: read_file — read file contents (with path sandboxing)
 // ============================================================================
 
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { ToolHandler } from "../types.js";
+import {
+  resolveSandboxedPath,
+  checkSensitivePath,
+  validateStringArg,
+  validateNumberArg,
+} from "../utils/security.js";
 
 export const readFileTool: ToolHandler = {
   definition: {
@@ -23,7 +29,7 @@ export const readFileTool: ToolHandler = {
         },
         limit: {
           type: "number",
-          description: "Maximum number of lines to read (default: 500)",
+          description: "Maximum number of lines to read (default: 500, max: 2000)",
         },
       },
       required: ["file_path"],
@@ -31,20 +37,34 @@ export const readFileTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const filePath = args.file_path as string;
-    const offset = (args.offset as number) || 1;
-    const limit = (args.limit as number) || 500;
+    const filePath = validateStringArg(args.file_path, "file_path");
+    const offset = validateNumberArg(args.offset ?? 1, "offset", 1);
+    const limit = validateNumberArg(args.limit ?? 500, "limit", 1, 2000);
 
     try {
-      const resolved = path.resolve(filePath);
+      // Security: resolve and validate path is within sandbox
+      const resolved = resolveSandboxedPath(filePath);
+
+      // Security: warn about sensitive files
+      const sensitiveWarning = checkSensitivePath(resolved);
+      let header = "";
+      if (sensitiveWarning) {
+        header += sensitiveWarning + "\n";
+      }
+
       const content = await fs.readFile(resolved, "utf-8");
       const lines = content.split("\n");
       const selected = lines.slice(offset - 1, offset - 1 + limit);
 
-      return selected
+      const body = selected
         .map((line, i) => `${String(offset + i).padStart(6)}|${line}`)
         .join("\n");
+
+      return header + body;
     } catch (err: any) {
+      if (err.message?.startsWith("Security:")) {
+        return err.message;
+      }
       return `Error reading file: ${err.message}`;
     }
   },

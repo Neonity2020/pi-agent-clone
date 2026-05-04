@@ -1,8 +1,9 @@
 // ============================================================================
-// Built-in tool: terminal — execute shell commands
+// Built-in tool: terminal — execute shell commands (with security validation)
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
+import { validateCommand, validateStringArg, validateNumberArg } from "../utils/security.js";
 
 export const terminalTool: ToolHandler = {
   definition: {
@@ -17,7 +18,7 @@ export const terminalTool: ToolHandler = {
         },
         timeout: {
           type: "number",
-          description: "Timeout in seconds (default: 30)",
+          description: "Timeout in seconds (default: 30, max: 300)",
         },
         workdir: {
           type: "string",
@@ -29,9 +30,15 @@ export const terminalTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const command = args.command as string;
-    const timeout = ((args.timeout as number) || 30) * 1000;
+    const command = validateStringArg(args.command, "command");
+    const timeout = validateNumberArg(args.timeout ?? 30, "timeout", 1, 300) * 1000;
     const workdir = args.workdir as string | undefined;
+
+    // Security: validate command for dangerous patterns
+    const validation = validateCommand(command);
+    if (!validation.allowed) {
+      return `Security: ${validation.reason}`;
+    }
 
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");
@@ -45,13 +52,19 @@ export const terminalTool: ToolHandler = {
       });
 
       let output = "";
+      if (validation.warning) {
+        output += validation.warning + "\n";
+      }
       if (stdout) output += stdout;
-      if (stderr) output += (output ? "\n" : "") + stderr;
+      if (stderr) output += (output && !output.endsWith("\n") ? "\n" : "") + stderr;
       return output || "(no output)";
     } catch (err: any) {
       let output = "";
+      if (validation.warning) {
+        output += validation.warning + "\n";
+      }
       if (err.stdout) output += err.stdout;
-      if (err.stderr) output += (output ? "\n" : "") + err.stderr;
+      if (err.stderr) output += (output && !output.endsWith("\n") ? "\n" : "") + err.stderr;
       output += `\n[exit code: ${err.code ?? "unknown"}]`;
       return output;
     }
