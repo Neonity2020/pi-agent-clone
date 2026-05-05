@@ -49,6 +49,7 @@ import { resolveCommand, formatHelp, type CommandContext } from "./commands/inde
 import { ThinkRenderer } from "./think-render.js";
 import { renderMarkdown, renderInline, chalk } from "./markdown.js";
 import type { AgentConfig, AgentEvent } from "../types.js";
+import { CostRouter, type RouterStrategy } from "../router/index.js";
 
 // ---- Chalk shortcuts --------------------------------------------------------
 
@@ -81,16 +82,19 @@ const c = {
 
 // ---- Parse CLI args --------------------------------------------------------
 
-function parseArgs(): { model: string; provider?: string } {
+function parseArgs(): { model: string; provider?: string; router?: boolean } {
   const args = process.argv.slice(2);
   let model = process.env.DEFAULT_MODEL || "glm-4-flash";
   let provider: string | undefined;
+  let router = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--model" || args[i] === "-m") {
       model = args[++i];
     } else if (args[i] === "--provider" || args[i] === "-p") {
       provider = args[++i];
+    } else if (args[i] === "--router" || args[i] === "-r") {
+      router = true;
     } else if (args[i] === "--help" || args[i] === "-h") {
       console.log(`
 ${c.info("pi-agent-clone v0.1.0")}  ${c.dim("— AI coding agent with long-term memory")}
@@ -125,7 +129,7 @@ ${c.bold("Long-term memory:")}
     }
   }
 
-  return { model, provider };
+  return { model, provider, router };
 }
 
 // ---- Built-in slash commands (non-registry) --------------------------------
@@ -195,10 +199,98 @@ function handleBuiltinCommand(cmd: string, agent: AgentLoop, config: AgentConfig
 
 const SPINNER_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
 
+// ---- Router command handler ------------------------------------------------
+
+async function handleRouterCommand(
+  input: string,
+  router: CostRouter,
+  config: AgentConfig,
+): Promise<void> {
+  const parts = input.split(/\s+/);
+  const sub = parts[1];
+
+  switch (sub) {
+    case "stats": {
+      const stats = router.getStats();
+      console.log("");
+      console.log(c.bold.cyan("  ╔══════════════════════════════════════╗"));
+      console.log(c.bold.cyan("  ║") + c.bold.white("  Router Statistics                   ") + c.bold.cyan("║"));
+      console.log(c.bold.cyan("  ╚══════════════════════════════════════╝"));
+      console.log("");
+      console.log(`  ${c.cyan("Total queries:")}     ${stats.totalQueries}`);
+      console.log(`  ${c.cyan("Cheap (M2.7):")}       ${stats.cheapQueries}`);
+      console.log(`  ${c.cyan("Expensive (GLM-5.1):")} ${stats.expensiveQueries}`);
+      console.log(`  ${c.cyan("Escalation rate:")}    ${c.bold(`${stats.escalationRate}%`)}`);
+      console.log(`  ${c.cyan("Classify tokens:")}    ${stats.totalClassifyTokens}`);
+      console.log(`  ${c.cyan("Strategy:")}           ${router.getStrategy()}`);
+      console.log(`  ${c.cyan("Threshold:")}          ${router.getThreshold()}`);
+
+      if (stats.history.length > 0) {
+        console.log(`\n  ${c.bold("Recent decisions:")}`);
+        const recent = stats.history.slice(-10);
+        for (const d of recent) {
+          const icon = d.escalated ? c.yellow("↑") : c.green("·");
+          const model = d.model.name;
+          const score = d.score >= 0 ? `score=${d.score}` : "baseline";
+          console.log(`    ${icon} ${c.dim(model)} ${c.dim(score)} ${c.dim(`${d.classifyTimeMs}ms`)}`);
+        }
+      }
+      console.log("");
+      break;
+    }
+
+    case "test": {
+      const query = parts.slice(2).join(" ");
+      if (!query) {
+        console.log(c.dim("Usage: /router test <your query here>"));
+        break;
+      }
+      console.log(c.dim(`  Classifying: "${query.slice(0, 80)}${query.length > 80 ? "..." : ""}"`));
+      const result = await router.classify(query);
+      const model = result.score >= router.getThreshold()
+        ? router.getExpensiveModel().name
+        : router.getCheapModel().name;
+      const escalated = result.score >= router.getThreshold();
+      console.log(
+        `  Score: ${c.bold(String(result.score))} → ${escalated ? c.cyan(model) : c.yellow(model)} ` +
+        c.dim(`(raw: "${result.raw.trim()}")`),
+      );
+      break;
+    }
+
+    case "strategy": {
+      const strategy = parts[2] as RouterStrategy;
+      if (!strategy || !["pre-classify", "always-cheap", "always-expensive"].includes(strategy)) {
+        console.log(c.dim("Usage: /router strategy <pre-classify|always-cheap|always-expensive>"));
+        break;
+      }
+      router.setStrategy(strategy);
+      console.log(`  ${c.success("✓")} Strategy: ${c.bold(strategy)}`);
+      break;
+    }
+
+    case "reset": {
+      router.resetStats();
+      console.log(`  ${c.success("✓")} Stats reset`);
+      break;
+    }
+
+    default:
+      console.log("");
+      console.log(c.bold("  Router Commands:"));
+      console.log(`    ${c.green("/router stats")}      ${c.dim("— Show routing statistics")}`);
+      console.log(`    ${c.green("/router test <q>")}    ${c.dim("— Classify a query without running")}`);
+      console.log(`    ${c.green("/router strategy <s>")} ${c.dim("— Switch strategy (pre-classify|always-cheap|always-expensive)")}`);
+      console.log(`    ${c.green("/router reset")}      ${c.dim("— Reset statistics")}`);
+      console.log("");
+      break;
+  }
+}
+
 // ---- Main ------------------------------------------------------------------
 
 async function main() {
-  const { model: modelId } = parseArgs();
+  const { model: modelId, router: enableRouter } = parseArgs();
   const model = MODELS[modelId];
   if (!model) {
     console.error(c.error(`Unknown model: ${modelId}`));
@@ -227,6 +319,23 @@ async function main() {
 
   const agent = new AgentLoop(config);
 
+  // ── Initialize Cost Router (if --router flag) ──────────────────────────
+  let costRouter: CostRouter | null = null;
+  if (enableRouter) {
+    const cheapModel = MODELS["MiniMax-M2.7"];
+    const expensiveModel = MODELS["glm-5.1"];
+    if (!cheapModel || !expensiveModel) {
+      console.error(c.error("Router requires both MiniMax-M2.7 and glm-5.1 in model registry."));
+      process.exit(1);
+    }
+    costRouter = new CostRouter({
+      cheapModel,
+      expensiveModel,
+      threshold: 4,
+      strategy: "pre-classify",
+    });
+  }
+
   // Check memory status at startup
   const memStats = await getMemoryStats();
 
@@ -240,6 +349,9 @@ async function main() {
   console.log(`  ${c.cyan("Model:")}   ${c.bold(model.name)} ${c.dim(`(${model.provider})`)}`);
   console.log(`  ${c.cyan("Tools:")}   ${c.dim(allTools.map((t) => t.definition.name).join(", "))}`);
   console.log(`  ${c.cyan("Memory:")}  ${c.magenta(`${memStats.entries} entries`)} ${c.dim(memStats.path)}`);
+  if (costRouter) {
+    console.log(`  ${c.cyan("Router:")}   ${c.bold.yellow("ON")} ${c.dim("M2.7 → GLM-5.1 (threshold=4)")}`);
+  }
   console.log("");
   console.log(`  ${c.dim("Type your message · /help for commands · Ctrl+C to exit")}`);
   console.log("");
@@ -260,6 +372,13 @@ async function main() {
 
       // Slash commands
       if (trimmed.startsWith("/")) {
+        // Router commands (only when router is active)
+        if (costRouter && trimmed.startsWith("/router")) {
+          await handleRouterCommand(trimmed, costRouter, config);
+          prompt();
+          return;
+        }
+
         // Try built-in commands first (session control)
         if (handleBuiltinCommand(trimmed, agent, config)) {
           prompt();
@@ -293,6 +412,28 @@ async function main() {
       }
 
       // Run agent
+      // ── Router: classify & swap model if router is active ──────────────
+      if (costRouter) {
+        try {
+          const decision = await costRouter.route(trimmed);
+          const arrow = decision.escalated
+            ? `${c.yellow("M2.7")} ${c.bold("→")} ${c.cyan("GLM-5.1")}`
+            : `${c.yellow("M2.7")} (direct)`;
+          const scoreStr = decision.score >= 0
+            ? `complexity=${decision.score}`
+            : "no-classify";
+          console.log(
+            `  ${c.dim("🔀 Router:")} ${arrow} ${c.dim(scoreStr)} ${c.dim(`(${decision.classifyTimeMs}ms)`)}`,
+          );
+          // Swap model on the agent config
+          config.model = decision.model;
+        } catch (err) {
+          // Classification failed — fall back to cheap model
+          console.log(`  ${c.warning("⚠ Router classify failed, using cheap model")}`);
+          config.model = costRouter.getCheapModel();
+        }
+      }
+
       // Show animated thinking indicator
       let spinnerIdx = 0;
       const spinnerInterval = setInterval(() => {
