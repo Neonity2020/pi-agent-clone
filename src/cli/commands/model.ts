@@ -145,7 +145,12 @@ async function interactivePicker(ctx: CommandContext): Promise<void> {
   }
 
   const model = MODELS[selectedModel.value];
-  if (model) switchModel(ctx, model);
+  if (!model) return;
+
+  switchModel(ctx, model);
+
+  // ── Stage 3: Set max iterations ──────────────────────────────────────────
+  await setMaxIterations(ctx);
 }
 
 // ---- Switch model ----------------------------------------------------------
@@ -158,6 +163,31 @@ function switchModel(ctx: CommandContext, model: Model): void {
     c.dim(`(${model.provider} | ${formatTokens(model.contextWindow)} ctx | ` +
     `${formatTokens(model.maxTokens)} out)`),
   );
+}
+
+// ---- Set max iterations (Stage 3 of interactive picker) ---------------------
+
+async function setMaxIterations(ctx: CommandContext): Promise<void> {
+  const current = ctx.config.maxIterations;
+  const presets: PickerItem[] = [
+    { label: "10 turns",  value: "10",  detail: "quick tasks",     badge: current === 10 ? "◀ current" : undefined },
+    { label: "20 turns",  value: "20",  detail: "default",         badge: current === 20 ? "◀ current" : undefined },
+    { label: "30 turns",  value: "30",  detail: "extended",        badge: current === 30 ? "◀ current" : undefined },
+    { label: "50 turns",  value: "50",  detail: "long sessions",   badge: current === 50 ? "◀ current" : undefined },
+  ];
+
+  const selected = await pick(presets, {
+    title: `── Max Iterations (current: ${current}) ──`,
+    footer: "↑↓ navigate · Enter select · Ctrl+C keep current",
+  }, ctx.rl);
+
+  if (!selected) {
+    console.log(`  ${c.dim(`Keeping ${current} iterations.`)}`);
+    return;
+  }
+
+  ctx.config.maxIterations = parseInt(selected.value, 10);
+  console.log(`  ${c.success("✓")} Max iterations: ${c.bold(selected.value)}`);
 }
 
 // ---- Match provider name (fuzzy) -------------------------------------------
