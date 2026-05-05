@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { MessageList } from "./message-list";
 import { ChatInput } from "./chat-input";
 import { ModelSelector } from "./model-selector";
@@ -9,12 +9,85 @@ import type { ChatMessage } from "./message-item";
 let msgCounter = 0;
 function nextId() { return `msg_${++msgCounter}_${Date.now()}`; }
 
-export function ChatContainer() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+// 测试用的预设消息
+function getTestMessages(): ChatMessage[] {
+  return [
+    {
+      id: nextId(),
+      role: "assistant",
+      content: "这是一个测试对话，用于演示文件下载功能。\n\n项目根目录有以下文件：\n- README.md\n- package.json\n- next.config.ts\n\n您可以点击下面的文件名下载对应文件。",
+      thinkingBlocks: [],
+      toolCalls: [],
+      isStreaming: false,
+    },
+    {
+      id: nextId(),
+      role: "assistant",
+      content: "我已为您生成报告文件 AGENT_WEB_UI_BUILD_REPORT.md。\n\n您可以点击下方按钮下载：\n[download:AGENT_WEB_UI_BUILD_REPORT.md]",
+      thinkingBlocks: [],
+      toolCalls: [],
+      isStreaming: false,
+    },
+    {
+      id: nextId(),
+      role: "user",
+      content: "测试下载链接",
+      thinkingBlocks: [],
+      toolCalls: [],
+    },
+    {
+      id: nextId(),
+      role: "assistant",
+      content: "好的，这里有几个测试文件路径供您测试下载功能：\n\n1. README.md\n2. package.json\n3. next.config.ts\n\n点击上方的文件名即可下载！",
+      thinkingBlocks: [],
+      toolCalls: [],
+      isStreaming: false,
+    },
+  ];
+}
+
+export interface ChatContainerProps {
+  initialMessages?: ChatMessage[];
+  initialSessionId?: string;
+  onSessionUpdate?: (messages: ChatMessage[]) => void;
+  onSessionIdChange?: (sessionId: string) => void;
+  isTestMode?: boolean;
+}
+
+export function ChatContainer({
+  initialMessages = [],
+  initialSessionId = "",
+  onSessionUpdate,
+  onSessionIdChange,
+  isTestMode = false,
+}: ChatContainerProps = {}) {
+  // 如果是测试模式，使用预设消息；否则使用传入的 initialMessages
+  const [messages, setMessages] = useState<ChatMessage[]>(isTestMode ? getTestMessages() : initialMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [model, setModel] = useState("glm-4.7");
-  const [sessionId, setSessionId] = useState("");
+  const [model, setModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("pi-agent-selected-model") || "glm-4.7";
+    }
+    return "glm-4.7";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("pi-agent-selected-model", model);
+  }, [model]);
+  const [sessionId, setSessionId] = useState(initialSessionId);
+
+  useEffect(() => {
+    if (messages !== initialMessages && !isTestMode) {
+      onSessionUpdate?.(messages);
+    }
+  }, [messages, onSessionUpdate]); // initialMessages is omitted intentionally to only trigger on changes
+
+  useEffect(() => {
+    if (sessionId && sessionId !== initialSessionId) {
+      onSessionIdChange?.(sessionId);
+    }
+  }, [sessionId, initialSessionId]);
 
   const handleSend = useCallback(async (text: string) => {
     setIsLoading(true);
@@ -80,11 +153,27 @@ export function ChatContainer() {
 
               case "message_done": {
                 setIsThinking(false);
+                const patch: Partial<ChatMessage> = {};
                 if (currentThinking) {
-                  const thinkBlocks = parseThinkBlocks(currentThinking);
-                  const finalText = extractDisplayText(currentThinking);
-                  updateAsst({ content: finalText, thinkingBlocks: thinkBlocks });
+                  patch.thinkingBlocks = parseThinkBlocks(currentThinking);
+                  patch.content = extractDisplayText(currentThinking);
                   currentThinking = "";
+                }
+                if (Object.keys(patch).length > 0) {
+                  updateAsst(patch);
+                }
+                if (event.message && Array.isArray(event.message.toolCalls)) {
+                  setMessages((prev) => prev.map((m) => {
+                    if (m.id !== asstId) return m;
+                    const updatedToolCalls = m.toolCalls.map((t) => {
+                      const incoming = event.message.toolCalls.find((inTc: any) => inTc.id === t.id);
+                      if (incoming) {
+                        return { ...t, arguments: incoming.arguments };
+                      }
+                      return t;
+                    });
+                    return { ...m, toolCalls: updatedToolCalls };
+                  }));
                 }
                 break;
               }
@@ -93,7 +182,7 @@ export function ChatContainer() {
                 setIsThinking(false);
                 setMessages((prev) => prev.map((m) =>
                   m.id === asstId
-                    ? { ...m, toolCalls: [...m.toolCalls, { name: event.toolCall?.name || "unknown", arguments: event.toolCall?.arguments }] }
+                    ? { ...m, toolCalls: [...m.toolCalls, { id: event.toolCall?.id, name: event.toolCall?.name || "unknown", arguments: event.toolCall?.arguments }] }
                     : m
                 ));
                 break;
@@ -102,7 +191,7 @@ export function ChatContainer() {
                 setMessages((prev) => prev.map((m) => {
                   if (m.id !== asstId) return m;
                   const tc = m.toolCalls.map((t) =>
-                    !t.result ? { ...t, result: event.result, isError: event.isError } : t
+                    t.id === event.toolCallId ? { ...t, result: event.result, isError: event.isError } : t
                   );
                   return { ...m, toolCalls: tc };
                 }));
@@ -213,7 +302,7 @@ function exportChat(messages: ChatMessage[]) {
     }
   }
 
-  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const blob = new Blob([lines.join("\n")], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -221,5 +310,5 @@ function exportChat(messages: ChatMessage[]) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -43,12 +43,12 @@ export function ToolCallDisplay({ name, arguments: args, result, isError }: Tool
   );
 }
 
-interface WriteFileData {
+export interface WriteFileData {
   path: string;
   content: string;
 }
 
-function parseWriteFileArgs(
+export function parseWriteFileArgs(
   name: string,
   args: string | undefined,
   result: string | undefined,
@@ -69,8 +69,9 @@ function parseWriteFileArgs(
   return null;
 }
 
-function downloadFile(data: WriteFileData) {
-  const blob = new Blob([data.content], { type: "text/plain;charset=utf-8" });
+export function downloadFile(data: WriteFileData) {
+  // Use application/octet-stream to prevent browsers from appending .txt to the file
+  const blob = new Blob([data.content], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -80,5 +81,5 @@ function downloadFile(data: WriteFileData) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
