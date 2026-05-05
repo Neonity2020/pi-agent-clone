@@ -89,6 +89,28 @@ The agent includes automatic context window protection:
 - **80% Threshold**: Automatically trims when approaching context limit
 - **FIFO Strategy**: Preserves recent messages by default
 
+## Cost Router
+
+Intelligent model routing inspired by [FrugalGPT](https://arxiv.org/abs/2305.05176):
+
+```
+User query → classify complexity (cheap model) → route to cheap/expensive model
+```
+
+- **Default**: MiniMax M2.7 (cheap) → GLM-5.1 (expensive), threshold=4
+- **Strategies**: `pre-classify` (default), `always-cheap`, `always-expensive`
+
+```bash
+# Enable router
+pi-agent --router
+
+# Slash commands
+/router stats          # Show routing statistics
+/router test <query>   # Classify a query without running
+/router strategy <s>   # Switch strategy
+/router reset          # Reset statistics
+```
+
 ## Documentation
 
 - [LEARNING_GUIDE.md](.agent-output/artifacts/docs/LEARNING_GUIDE.md) - Complete learning path
@@ -103,6 +125,7 @@ pi-agent-clone/
 │   ├── cli/             # Command-line interface
 │   ├── context/         # Context management
 │   ├── provider/        # LLM provider transports
+│   ├── router/          # Cost-aware model routing
 │   └── tool/            # Built-in tools
 ├── .agent-output/       # Agent-generated artifacts
 │   └── artifacts/docs/  # Documentation

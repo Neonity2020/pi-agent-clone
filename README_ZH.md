@@ -89,6 +89,28 @@ Agent 包含自动上下文窗口保护：
 - **80% 阈值**：接近限制时自动截断
 - **FIFO 策略**：默认保留最近的消息
 
+## 智能路由
+
+基于 [FrugalGPT](https://arxiv.org/abs/2305.05176) 的智能模型路由：
+
+```
+用户查询 → 分类复杂度（廉价模型）→ 路由到廉价/昂贵模型
+```
+
+- **默认配置**：MiniMax M2.7（廉价）→ GLM-5.1（昂贵），阈值=4
+- **策略**：`pre-classify`（默认）、`always-cheap`、`always-expensive`
+
+```bash
+# 启用路由
+pi-agent --router
+
+# 斜杠命令
+/router stats          # 查看路由统计
+/router test <查询>    # 分类查询但不执行
+/router strategy <策略> # 切换路由策略
+/router reset          # 重置统计
+```
+
 ## 文档
 
 - [LEARNING_GUIDE.md](.agent-output/artifacts/docs/LEARNING_GUIDE.md) - 完整学习路径
@@ -103,6 +125,7 @@ pi-agent-clone/
 │   ├── cli/             # 命令行界面
 │   ├── context/         # 上下文管理
 │   ├── provider/        # LLM 提供商传输
+│   ├── router/          # 成本感知的模型路由
 │   └── tool/            # 内置工具
 ├── .agent-output/       # Agent 生成的产物
 │   └── artifacts/docs/  # 文档
