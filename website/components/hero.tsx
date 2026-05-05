@@ -10,6 +10,7 @@ const copy = {
       'Pi-Agent Clone helps you plan, edit, run, and ship code with support for leading LLM providers.',
     ctaPrimary: 'Get Started',
     ctaSecondary: 'Explore Features',
+    ctaChat: 'Try Web Chat',
   },
   zh: {
     badge: '开源 · 多模型提供商 · CLI 优先',
@@ -17,6 +18,7 @@ const copy = {
     subtitle: 'Pi-Agent Clone 帮助你完成规划、编辑、运行与交付代码，并支持主流大模型提供商。',
     ctaPrimary: '立即开始',
     ctaSecondary: '探索功能',
+    ctaChat: '在线体验',
   },
 } as const;
 
@@ -34,6 +36,9 @@ export function Hero({ lang }: HeroProps) {
         </a>
         <a href="#features" className="btn btn-ghost">
           {content.ctaSecondary}
+        </a>
+        <a href="/chat" className="btn btn-ghost">
+          {content.ctaChat}
         </a>
       </div>
     </section>
