@@ -1,4 +1,4 @@
-# pi-agent-clone
+# neonity-agent
 
 A lightweight AI coding agent framework with multi-provider LLM support, inspired by pi-mono's architecture.
 
