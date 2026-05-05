@@ -112,9 +112,10 @@ async function interactivePicker(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  // Auto-select if only one model
+  // Auto-select if only one model, still proceed to iterations picker
   if (models.length === 1) {
     switchModel(ctx, models[0]);
+    await setMaxIterations(ctx);
     return;
   }
 
