@@ -310,6 +310,7 @@ h1 {
 }
 .tool-call-header:hover { color: var(--text); }
 .tool-name { color: #f0c674; font-weight: 600; }
+.tool-name-detail { color: var(--muted); font-weight: 400; font-size: 0.82rem; margin-left: 0.3rem; }
 .tool-status-ok { color: #81c784; }
 .tool-status-err { color: #e57373; }
 .tool-result {
@@ -411,3 +412,45 @@ h1 {
   border-top: 1px solid var(--line);
   margin: 0.5rem 0;
 }
+
+/* Message actions (copy, download) */
+.msg-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.msg-assistant:hover .msg-actions { opacity: 1; }
+.msg-action-btn {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--muted);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.msg-action-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(107, 140, 255, 0.08);
+}
+
+/* Export button in header */
+.export-btn {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  color: var(--muted);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.export-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.export-btn:disabled { opacity: 0.3; cursor: not-allowed; }

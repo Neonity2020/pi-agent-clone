@@ -1,16 +1,24 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ThinkingBlock } from "./thinking-block";
 import { ToolCallDisplay } from "./tool-call-display";
+
+export interface ToolCallInfo {
+  name: string;
+  arguments?: string;
+  result?: string;
+  isError?: boolean;
+}
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   thinkingBlocks: string[];
-  toolCalls: { name: string; result?: string; isError?: boolean }[];
+  toolCalls: ToolCallInfo[];
   isStreaming?: boolean;
 }
 
@@ -27,21 +35,56 @@ export function MessageItem({ message }: MessageItemProps) {
     );
   }
 
+  const textContent = stripThinkTags(message.content);
+
   return (
     <div className="msg-assistant">
       {message.thinkingBlocks.map((block, i) => (
         <ThinkingBlock key={i} content={block} />
       ))}
       {message.toolCalls.map((tc, i) => (
-        <ToolCallDisplay key={i} name={tc.name} result={tc.result} isError={tc.isError} />
+        <ToolCallDisplay key={i} name={tc.name} arguments={tc.arguments} result={tc.result} isError={tc.isError} />
       ))}
-      {message.content && (
+      {textContent && (
         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {stripThinkTags(message.content)}
+          {textContent}
         </ReactMarkdown>
       )}
       {message.isStreaming && <span className="streaming-cursor" />}
+      {!message.isStreaming && textContent && (
+        <div className="msg-actions">
+          <CopyButton text={textContent} />
+        </div>
+      )}
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Fallback for non-HTTPS
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }, [text]);
+
+  return (
+    <button className="msg-action-btn" onClick={handleCopy}>
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

@@ -93,7 +93,7 @@ export function ChatContainer() {
                 setIsThinking(false);
                 setMessages((prev) => prev.map((m) =>
                   m.id === asstId
-                    ? { ...m, toolCalls: [...m.toolCalls, { name: event.toolCall?.name || "unknown" }] }
+                    ? { ...m, toolCalls: [...m.toolCalls, { name: event.toolCall?.name || "unknown", arguments: event.toolCall?.arguments }] }
                     : m
                 ));
                 break;
@@ -140,6 +140,13 @@ export function ChatContainer() {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingBottom: "0.3rem" }}>
         <ModelSelector value={model} onChange={setModel} />
+        <button
+          className="export-btn"
+          onClick={() => exportChat(messages)}
+          disabled={messages.length === 0}
+        >
+          Export Chat
+        </button>
       </div>
       <ChatInput onSend={handleSend} disabled={isLoading} />
     </>
@@ -175,4 +182,44 @@ function parseThinkBlocks(raw: string): string[] {
     if (content) blocks.push(content);
   }
   return blocks;
+}
+
+function exportChat(messages: ChatMessage[]) {
+  const lines: string[] = ["# Pi-Agent Chat Export", ""];
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      lines.push("## User", "");
+      lines.push(msg.content);
+      lines.push("");
+    } else {
+      lines.push("## Assistant", "");
+      if (msg.thinkingBlocks.length) {
+        lines.push("<details><summary>Thinking</summary>", "");
+        for (const block of msg.thinkingBlocks) {
+          lines.push(block);
+        }
+        lines.push("", "</details>", "");
+      }
+      for (const tc of msg.toolCalls) {
+        lines.push(`**Tool: ${tc.name}** ${tc.isError ? "(error)" : "(ok)"}`);
+        if (tc.result) lines.push("```", tc.result.slice(0, 500), "```");
+        lines.push("");
+      }
+      const text = msg.content.replace(/<think[\s\S]*?<\/think\s*>?\n?/gi, "").trim();
+      if (text) lines.push(text);
+      lines.push("");
+    }
+  }
+
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `chat-${ts}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
