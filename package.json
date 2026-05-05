@@ -1,11 +1,11 @@
 {
-  "name": "pi-agent-clone",
+  "name": "neonity-agent",
   "version": "0.1.0",
-  "description": "A pi-agent clone — AI coding agent with multi-provider support",
+  "description": "Neonity Agent — AI coding agent with multi-provider support",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "pi-agent": "dist/cli/index.js"
+    "neonity": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc",

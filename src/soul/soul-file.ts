@@ -2,7 +2,7 @@
 // SOUL.md - Agent's Personality and Identity
 //
 // Design:
-//   - Single file: ~/.pi-agent/SOUL.md
+//   - Single file: ~/.neonity-agent/SOUL.md
 //   - Format: §-delimited entries (same as MEMORY.md for consistency)
 //   - Each entry defines the agent's personality traits, behavior guidelines,
 //     communication style, or identity elements
@@ -25,7 +25,7 @@ import * as path from "path";
 import * as os from "os";
 
 const DEFAULT_SOUL_DIR = () =>
-  path.join(os.homedir(), ".pi-agent");
+  path.join(os.homedir(), ".neonity-agent");
 const SOUL_FILENAME = "SOUL.md";
 const SEPARATOR = "§";
 

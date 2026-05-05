@@ -60,12 +60,12 @@ console.log(chalk.dim.cyan("  Think block content"));
 
 console.log("\n=== Banner Test ===\n");
 console.log(chalk.bold.cyan("  ╔══════════════════════════════════════╗"));
-console.log(chalk.bold.cyan("  ║") + chalk.bold.white("  pi-agent-clone v0.1.0                ") + chalk.bold.cyan("║"));
+console.log(chalk.bold.cyan("  ║") + chalk.bold.white("  neonity-agent v0.1.0               ") + chalk.bold.cyan("║"));
 console.log(chalk.bold.cyan("  ╚══════════════════════════════════════╝"));
 console.log();
 console.log("  " + chalk.cyan("Model:") + "   " + chalk.bold("GLM-5.1") + " " + chalk.dim("(glm)"));
 console.log("  " + chalk.cyan("Tools:") + "   " + chalk.dim("terminal, read_file, write_file"));
-console.log("  " + chalk.cyan("Memory:") + "  " + chalk.magenta("3 entries") + " " + chalk.dim("~/.pi-agent/MEMORY.md"));
+console.log("  " + chalk.cyan("Memory:") + "  " + chalk.magenta("3 entries") + " " + chalk.dim("~/.neonity-agent/MEMORY.md"));
 console.log();
 console.log("  " + chalk.dim("Type your message · /help for commands · Ctrl+C to exit"));
 

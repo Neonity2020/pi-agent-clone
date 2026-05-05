@@ -216,4 +216,4 @@ git push
 ---
 
 **最后更新**: 2025-05-03
-**维护者**: pi-agent-clone 项目团队
+**维护者**: neonity-agent 项目团队

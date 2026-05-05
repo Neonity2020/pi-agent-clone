@@ -2,7 +2,7 @@
 // MEMORY.md Long-Term Memory Provider
 //
 // Design:
-//   - Single file: ~/.pi-agent/MEMORY.md
+//   - Single file: ~/.neonity-agent/MEMORY.md
 //   - Format: §-delimited entries (same as Hermes Agent's FileMemoryProvider)
 //   - Each entry is a declarative fact, one per paragraph
 //   - Entries separated by "§" on its own line
@@ -22,7 +22,7 @@ import * as path from "path";
 import * as os from "os";
 
 const DEFAULT_MEMORY_DIR = () =>
-  path.join(os.homedir(), ".pi-agent");
+  path.join(os.homedir(), ".neonity-agent");
 const MEMORY_FILENAME = "MEMORY.md";
 const SEPARATOR = "§";
 

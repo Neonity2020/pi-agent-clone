@@ -102,7 +102,7 @@ User query → classify complexity (cheap model) → route to cheap/expensive mo
 
 ```bash
 # Enable router
-pi-agent --router
+neonity --router
 
 # Slash commands
 /router stats          # Show routing statistics
@@ -119,7 +119,7 @@ pi-agent --router
 ## Project Structure
 
 ```
-pi-agent-clone/
+neonity-agent/
 ├── src/
 │   ├── agent/           # Agent loop implementation
 │   ├── cli/             # Command-line interface

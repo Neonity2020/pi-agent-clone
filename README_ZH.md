@@ -1,4 +1,4 @@
-# pi-agent-clone
+# neonity-agent
 
 一个轻量级 AI 编码代理框架，支持多 LLM 提供商，灵感来自 pi-mono 的架构。
 
@@ -102,7 +102,7 @@ Agent 包含自动上下文窗口保护：
 
 ```bash
 # 启用路由
-pi-agent --router
+neonity --router
 
 # 斜杠命令
 /router stats          # 查看路由统计
@@ -119,7 +119,7 @@ pi-agent --router
 ## 项目结构
 
 ```
-pi-agent-clone/
+neonity-agent/
 ├── src/
 │   ├── agent/           # Agent 循环实现
 │   ├── cli/             # 命令行界面

@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     'openai',
     '@anthropic-ai/sdk',
     '@google/generative-ai',
-    'pi-agent-clone',
+    'neonity-agent',
   ],
 };
 

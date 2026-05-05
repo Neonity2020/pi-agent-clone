@@ -17,7 +17,7 @@ export function useChatHistory() {
   // Load from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("pi-agent-chat-sessions");
+      const stored = localStorage.getItem("neonity-agent-chat-sessions");
       if (stored) {
         const parsed = JSON.parse(stored);
         setSessions(parsed);
@@ -50,7 +50,7 @@ export function useChatHistory() {
   // Save to localStorage whenever sessions change
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem("pi-agent-chat-sessions", JSON.stringify(sessions));
+      localStorage.setItem("neonity-agent-chat-sessions", JSON.stringify(sessions));
     }
   }, [sessions, isLoaded]);
 

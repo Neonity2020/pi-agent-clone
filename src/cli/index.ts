@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================================
-// pi-agent-clone — Interactive REPL with long-term memory + pretty markdown
+// neonity-agent — Interactive REPL with long-term memory + pretty markdown
 //
 // Rendering pipeline:
 //   LLM stream → raw text buffer (during streaming)
@@ -84,7 +84,7 @@ const c = {
 
 function parseArgs(): { model: string; provider?: string; router?: boolean } {
   const args = process.argv.slice(2);
-  let model = process.env.DEFAULT_MODEL || "glm-4-flash";
+  let model = process.env.DEFAULT_MODEL || "glm-4.7";
   let provider: string | undefined;
   let router = false;
 
@@ -97,12 +97,12 @@ function parseArgs(): { model: string; provider?: string; router?: boolean } {
       router = true;
     } else if (args[i] === "--help" || args[i] === "-h") {
       console.log(`
-${c.info("pi-agent-clone v0.1.0")}  ${c.dim("— AI coding agent with long-term memory")}
+${c.info("neonity v0.1.0")}  ${c.dim("— AI coding agent with long-term memory")}
 
-${c.bold("Usage:")} pi-agent [options]
+${c.bold("Usage:")} neonity [options]
 
 ${c.bold("Options:")}
-  ${c.green("-m, --model <name>")}     Model to use (default: glm-4-flash)
+  ${c.green("-m, --model <name>")}     Model to use (default: glm-4.7)
   ${c.green("-p, --provider <name>")}  Provider to use
   ${c.green("-h, --help")}             Show this help
 
@@ -121,7 +121,7 @@ ${c.bold("Environment variables:")}
   ${c.dim("MINIMAX_API_KEY     ")} MiniMax API key
 
 ${c.bold("Long-term memory:")}
-  ${c.dim("~/.pi-agent/MEMORY.md")} — persists across sessions
+  ${c.dim("~/.neonity-agent/MEMORY.md")} — persists across sessions
 `);
       process.exit(0);
     } else if (!args[i].startsWith("-")) {
@@ -343,7 +343,7 @@ async function main() {
   // Use simple ASCII to avoid alignment issues across different terminals
   console.log("");
   console.log(c.bold.cyan("  ╔══════════════════════════════════════╗"));
-  console.log(c.bold.cyan("  ║ ") + c.bold.white("pi-agent-clone v0.1.0") + c.bold.cyan("                ║"));
+  console.log(c.bold.cyan("  ║ ") + c.bold.white("neonity v0.1.0") + c.bold.cyan("                  ║"));
   console.log(c.bold.cyan("  ╚══════════════════════════════════════╝"));
   console.log("");
   console.log(`  ${c.cyan("Model:")}   ${c.bold(model.name)} ${c.dim(`(${model.provider})`)}`);

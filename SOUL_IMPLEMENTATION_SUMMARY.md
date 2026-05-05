@@ -34,7 +34,7 @@ SOUL.md 机制已完整实现并测试通过！
 
 ### 1. SOUL.md 文件操作
 
-- ✅ `getSoulPath()` - 获取 SOUL.md 路径 (默认: `~/.pi-agent/SOUL.md`)
+- ✅ `getSoulPath()` - 获取 SOUL.md 路径 (默认: `~/.neonity-agent/SOUL.md`)
 - ✅ `readSoul()` - 读取所有个性特征
 - ✅ `writeSoul()` - 写入完整的个性特征数组
 - ✅ `addSoul()` - 添加新的个性特征（自动去重）
@@ -84,7 +84,7 @@ SOUL.md 机制已完整实现并测试通过！
 ✅ 完成
 
 📊 获取统计信息
-路径: /Users/andi/.pi-agent/SOUL.md
+路径: /Users/andi/.neonity-agent/SOUL.md
 条目数: 4
 文件大小: 236 字节
 ✅ 完成

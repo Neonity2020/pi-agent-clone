@@ -1,5 +1,5 @@
 {
-  "name": "pi-agent-clone-site",
+  "name": "neonity-agent-site",
   "private": true,
   "version": "0.1.0",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "next": "16.2.4",
-    "pi-agent-clone": "file:..",
+    "neonity-agent": "file:..",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-markdown": "^9.0.3",

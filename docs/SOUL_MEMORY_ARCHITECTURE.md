@@ -72,11 +72,11 @@
 │  ┌──────────────────────────────────┐  │
 │  │  buildSystemPrompt()             │  │
 │  │    ↓                            │  │
-│  │  read SOUL.md (~/.pi-agent/)    │  │
+│  │  read SOUL.md (~/.neonity-agent/)    │  │
 │  │    ↓                            │  │
 │  │  formatSoulForPrompt()          │  │
 │  │    ↓                            │  │
-│  │  read MEMORY.md (~/.pi-agent/)  │  │
+│  │  read MEMORY.md (~/.neonity-agent/)  │  │
 │  │    ↓                            │  │
 │  │  formatMemoryForPrompt()        │  │
 │  └──────────────────────────────────┘  │
@@ -124,7 +124,7 @@
 ## 文件系统布局
 
 ```
-~/.pi-agent/
+~/.neonity-agent/
 │
 ├── SOUL.md              # Agent 的个性与身份
 │   我是一个乐观、友好的助手。

@@ -67,13 +67,13 @@ export function ChatContainer({
   const [isThinking, setIsThinking] = useState(false);
   const [model, setModel] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("pi-agent-selected-model") || "glm-4.7";
+      return localStorage.getItem("neonity-agent-selected-model") || "glm-4.7";
     }
     return "glm-4.7";
   });
 
   useEffect(() => {
-    localStorage.setItem("pi-agent-selected-model", model);
+    localStorage.setItem("neonity-agent-selected-model", model);
   }, [model]);
   const [sessionId, setSessionId] = useState(initialSessionId);
 

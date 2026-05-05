@@ -1,4 +1,4 @@
-# Pi-Agent Clone Web UI
+# Neonity Agent Web UI
 
 > 一个现代化的 AI 智能体 Web 界面，基于 **Next.js 16 + React 19** 构建，支持多模型、流式输出和丰富的交互体验。
 
@@ -26,7 +26,7 @@
 | 开发语言 | TypeScript 6.0.0 |
 | 样式方案 | 原生 CSS (CSS Variables) |
 | Markdown | react-markdown + remark-gfm |
-| 核心 Agent | pi-agent-clone |
+| 核心 Agent | neonity-agent |
 
 ---
 
@@ -214,4 +214,4 @@ MIT License - 详见项目仓库。
 
 ---
 
-**项目仓库**: https://github.com/neonity2020/pi-agent-clone
+**项目仓库**: https://github.com/neonity2020/neonity-agent

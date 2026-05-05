@@ -26,12 +26,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <main className="container">
       <header className="topbar">
-        <span className="brand">Pi-Agent Clone</span>
+        <span className="brand">Neonity Agent</span>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <a href={lang === 'zh' ? '/' : '/?lang=zh'} className="repo-link">
             {content.langLabel}
           </a>
-          <a href="https://github.com/neonity2020/pi-agent-clone" className="repo-link" target="_blank" rel="noopener noreferrer">
+          <a href="https://github.com/neonity2020/neonity-agent" className="repo-link" target="_blank" rel="noopener noreferrer">
             GitHub
           </a>
         </div>
@@ -40,7 +40,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <FeatureGrid lang={lang} />
       <footer className="footer">
         <p>
-          © {new Date().getFullYear()} Pi-Agent Clone. {content.footer}
+          © {new Date().getFullYear()} Neonity Agent. {content.footer}
         </p>
       </footer>
     </main>

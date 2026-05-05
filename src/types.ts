@@ -1,5 +1,5 @@
 // ============================================================================
-// pi-agent-clone: Core Types
+// neonity-agent: Core Types
 // Inspired by pi-mono's @mariozechner/pi-ai types.ts
 // ============================================================================
 

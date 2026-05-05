@@ -12,7 +12,7 @@ npm start            # Run compiled CLI: node dist/cli/index.js
 npm run typecheck    # Type-check without emitting: tsc --noEmit
 ```
 
-The CLI accepts flags: `pi-agent -m <model> -p <provider> --router`
+The CLI accepts flags: `neonity -m <model> -p <provider> --router`
 
 The website (Next.js 16 app in `website/`) is independent: `cd website && npm run dev`
 
@@ -48,8 +48,8 @@ CLI (src/cli/) → AgentLoop (src/agent/loop.ts) → ProviderTransport (src/prov
 - **`src/cli/index.ts`** — Interactive REPL with chalk-colored output, markdown rendering (marked-terminal), `<think/>` block detection (ThinkRenderer), and slash commands
 - **`src/cli/models.ts`** — Model registry (`MODELS` record) with metadata (context window, cost, provider mapping)
 - **`src/event-stream.ts`** — Push-based `AsyncIterable` for streaming LLM events to consumers
-- **`src/memory/`** — Long-term memory persisted to `~/.pi-agent/MEMORY.md` (§-delimited entries, loaded into system prompt)
-- **`src/soul/`** — Agent personality persisted to `~/.pi-agent/SOUL.md` (same format as memory)
+- **`src/memory/`** — Long-term memory persisted to `~/.neonity-agent/MEMORY.md` (§-delimited entries, loaded into system prompt)
+- **`src/soul/`** — Agent personality persisted to `~/.neonity-agent/SOUL.md` (same format as memory)
 - **`src/router/index.ts`** — `CostRouter`: FrugalGPT-style model routing that classifies query complexity via cheap model, escalates to expensive model if score >= threshold
 
 ### Provider System

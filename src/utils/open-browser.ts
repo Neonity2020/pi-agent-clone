@@ -49,7 +49,7 @@ export async function openBrowser(url: string): Promise<void> {
  * Example usage:
  *
  * // Open GitHub repository
- * await openBrowser('https://github.com/Neonity2020/pi-agent-clone');
+ * await openBrowser('https://github.com/Neonity2020/neonity-agent');
  *
  * // Open a file
  * await openBrowser('file:///Users/andi/Documents/file.pdf');
