@@ -56,16 +56,11 @@ export interface RouterStats {
 
 // ---- Classification prompt -------------------------------------------------
 
-const CLASSIFY_SYSTEM = `You are a query complexity classifier for an AI coding agent.
-Rate the complexity of the user query on a scale of 1-5:
+const CLASSIFY_SYSTEM = `Rate this query's complexity 1-5. Output ONLY the number.
 
-1 = Simple: greetings, factual Q&A, definitions, simple math
-2 = Easy: straightforward task with clear steps, basic file operations
-3 = Moderate: basic coding, simple debugging, data transformation
-4 = Complex: multi-file coding, architecture decisions, complex debugging, creative writing
-5 = Very complex: novel problem-solving, system design, security analysis, multi-step reasoning
+1=greeting/definition 2=simple task 3=basic coding 4=multi-file/debugging 5=system design/novel problem
 
-Respond with ONLY a single number (1-5). No explanation.`;
+Do NOT reason. Do NOT explain. Output exactly one digit.`;
 
 // ---- CostRouter class ------------------------------------------------------
 
@@ -100,7 +95,7 @@ export class CostRouter {
       model: this.cheapModel,
       messages: [{ role: "user" as const, content: `User query: "${truncatedQuery}"` }],
       systemPrompt: CLASSIFY_SYSTEM,
-      maxTokens: 10,
+      maxTokens: 512,
       temperature: 0,
     });
 
@@ -173,7 +168,7 @@ export class CostRouter {
           model,
           score: result.score,
           escalated,
-          reasoning: `classifier="${result.raw.trim()}"`,
+          reasoning: `classifier="${result.raw.trim().slice(0, 100)}"`,
           classifyTimeMs,
         };
         break;
@@ -240,19 +235,45 @@ export class CostRouter {
 
   // ---- Internal helpers ----------------------------------------------------
 
-  /** Parse complexity score from classifier output. */
+  /**
+   * Parse complexity score from classifier output.
+   * Handles reasoning models that wrap output in <think.../think> tags.
+   */
   private parseScore(raw: string): number {
     const trimmed = raw.trim();
 
-    // Direct number
+    // ---- Case 1: closed think block — extract score after </think/ > ----
+    const thinkEndMatch = trimmed.match(/<\/think\s*>\s*([\s\S]*)$/i);
+    if (thinkEndMatch) {
+      const afterThink = thinkEndMatch[1].trim();
+      const direct = parseInt(afterThink, 10);
+      if (direct >= 1 && direct <= 5) return direct;
+      const match = afterThink.match(/\b([1-5])\b/);
+      if (match) return parseInt(match[1], 10);
+    }
+
+    // ---- Case 2: unclosed think block — scan from END to find final score ----
+    // Reasoning models often conclude with "X" or "score: X" at the very end.
+    // Scan backwards to avoid matching "1-5" scale references early in the text.
+    const lines = trimmed.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      // Match patterns like "5", "Score: 4", "Rating: 3", "complexity: 2"
+      const scored = line.match(/(?:score|rating|complexity|level)[:\s]*(\d)/i);
+      if (scored) {
+        const v = parseInt(scored[1], 10);
+        if (v >= 1 && v <= 5) return v;
+      }
+      // A line that is JUST a digit 1-5
+      const solo = line.match(/^([1-5])$/);
+      if (solo) return parseInt(solo[1], 10);
+    }
+
+    // ---- Case 3: direct number at start (non-reasoning models) ----
     const direct = parseInt(trimmed, 10);
     if (direct >= 1 && direct <= 5) return direct;
 
-    // Extract first digit 1-5 from response
-    const match = trimmed.match(/[1-5]/);
-    if (match) return parseInt(match[0], 10);
-
-    // Default to middle complexity → route to cheap (benefit of doubt for savings)
+    // ---- Default: route to cheap (benefit of doubt) ----
     return 3;
   }
 }
