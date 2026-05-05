@@ -30,7 +30,14 @@ const _origEmit = process.emit.bind(process) as (event: string | symbol, ...args
   return _origEmit(event, ...emitArgs);
 };
 
-import "dotenv/config";
+import { config as dotenvConfig } from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+// Load .env from the neonity-agent installation directory, not cwd
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenvConfig({ path: resolve(__dirname, "../../.env") });
 import * as readline from "readline";
 import { AgentLoop } from "../agent/loop.js";
 import { listProviders } from "../provider/registry.js";
