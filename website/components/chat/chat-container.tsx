@@ -129,7 +129,7 @@ export function ChatContainer() {
 
   return (
     <>
-      <div className="message-list-wrapper" style={{ flex: 1, overflow: "hidden" }}>
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         <MessageList messages={messages} />
         {isThinking && (
           <div className="thinking-indicator">
