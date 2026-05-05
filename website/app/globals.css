@@ -394,6 +394,14 @@ h1 {
   50% { opacity: 0; }
 }
 
+/* Thinking indicator */
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
 /* Turn separator */
 .turn-info {
   color: var(--muted);
