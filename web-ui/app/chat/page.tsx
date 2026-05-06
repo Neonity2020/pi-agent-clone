@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Chat | Pi-Agent Clone",
+  title: "Chat | Neonity Agent",
 };
 
 function Loading() {

@@ -5,7 +5,9 @@ package-lock.json
 # Build output
 dist/
 .next/
-website/.next/
+site/.next/
+site/out/
+web-ui/.next/
 
 # Environment variables
 .env

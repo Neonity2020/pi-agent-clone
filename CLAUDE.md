@@ -14,7 +14,12 @@ npm run typecheck    # Type-check without emitting: tsc --noEmit
 
 The CLI accepts flags: `neonity -m <model> -p <provider> --router`
 
-The website (Next.js 16 app in `website/`) is independent: `cd website && npm run dev`
+### Web Projects
+
+Two independent Next.js 16 apps live at the repo root:
+
+- **`site/`** — Pure static landing page (Hero + Features, dark theme, en/zh). Builds to flat HTML via `output: 'export'`. Zero backend. `cd site && npm run dev`
+- **`web-ui/`** — Agent Web UI (chat interface with SSE streaming). Depends on `neonity-agent` core via `file:..`. Has API routes (`/api/chat`). `cd web-ui && npm run dev`
 
 ## Architecture
 
