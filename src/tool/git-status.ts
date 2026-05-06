@@ -1,8 +1,9 @@
 // ============================================================================
-// Built-in tool: git_status — show Git repository status
+// Built-in tool: git_status — show Git repository status (with path sandboxing)
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
+import { resolveSandboxedPath, getSandboxRoot } from "../utils/security.js";
 
 export const gitStatusTool: ToolHandler = {
   definition: {
@@ -13,14 +14,21 @@ export const gitStatusTool: ToolHandler = {
       properties: {
         path: {
           type: "string",
-          description: "Repository path (defaults to current directory)",
+          description: "Repository path (defaults to sandbox root)",
         },
       },
     },
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const path = args.path as string | undefined;
+    const rawPath = args.path as string | undefined;
+
+    let safePath: string;
+    try {
+      safePath = rawPath ? resolveSandboxedPath(rawPath) : getSandboxRoot();
+    } catch (err: any) {
+      return `Security: ${err.message}`;
+    }
 
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");
@@ -30,14 +38,14 @@ export const gitStatusTool: ToolHandler = {
       // Get status with porcelain format for easy parsing
       const { stdout, stderr } = await execFileAsync(
         "git",
-        ["-C", path || ".", "status", "--short"],
+        ["-C", safePath, "status", "--short"],
         {
           maxBuffer: 1024 * 1024,
           timeout: 10000,
         },
       );
 
-      let output = `Git Status for: ${path || "current directory"}\n`;
+      let output = `Git Status for: ${safePath}\n`;
       output += "=" .repeat(50) + "\n\n";
 
       if (!stdout.trim()) {

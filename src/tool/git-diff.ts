@@ -1,8 +1,9 @@
 // ============================================================================
-// Built-in tool: git_diff — show changes between commits
+// Built-in tool: git_diff — show changes between commits (with path sandboxing)
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
+import { resolveSandboxedPath, getSandboxRoot } from "../utils/security.js";
 
 export const gitDiffTool: ToolHandler = {
   definition: {
@@ -13,7 +14,7 @@ export const gitDiffTool: ToolHandler = {
       properties: {
         path: {
           type: "string",
-          description: "Repository path (defaults to current directory)",
+          description: "Repository path (defaults to sandbox root)",
         },
         target: {
           type: "string",
@@ -32,17 +33,24 @@ export const gitDiffTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const path = args.path as string | undefined;
+    const rawPath = args.path as string | undefined;
     const target = args.target as string | undefined;
     const file = args.file as string | undefined;
     const lines = (args.lines as number) || 3;
+
+    let safePath: string;
+    try {
+      safePath = rawPath ? resolveSandboxedPath(rawPath) : getSandboxRoot();
+    } catch (err: any) {
+      return `Security: ${err.message}`;
+    }
 
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");
     const execFileAsync = promisify(execFile);
 
     try {
-      const gitArgs: string[] = ["-C", path || ".", "diff"];
+      const gitArgs: string[] = ["-C", safePath, "diff"];
 
       if (target) {
         gitArgs.push(target);
@@ -59,7 +67,7 @@ export const gitDiffTool: ToolHandler = {
         timeout: 15000,
       });
 
-      let output = `Git Diff${target ? ` (${target})` : ""} for: ${path || "current directory"}\n`;
+      let output = `Git Diff${target ? ` (${target})` : ""} for: ${safePath}\n`;
       output += "=".repeat(60) + "\n\n";
 
       if (!stdout.trim()) {

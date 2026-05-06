@@ -3,7 +3,7 @@
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
-import { validateStringArg, validateNumberArg } from "../utils/security.js";
+import { validateStringArg, validateNumberArg, getSandboxRoot, resolveSandboxedPath } from "../utils/security.js";
 
 /**
  * Parse a command string into an array of arguments, respecting quoted strings.
@@ -87,7 +87,16 @@ export const gitTool: ToolHandler = {
   async execute(args: Record<string, unknown>): Promise<string> {
     const gitCommand = validateStringArg(args.command, "command");
     const timeout = validateNumberArg(args.timeout ?? 60, "timeout", 1, 600) * 1000;
-    const workdir = args.workdir as string | undefined;
+
+    // Resolve workdir within sandbox (default to sandbox root)
+    let workdir: string;
+    try {
+      workdir = args.workdir
+        ? resolveSandboxedPath(args.workdir as string)
+        : getSandboxRoot();
+    } catch (err: any) {
+      return `Security: ${err.message}`;
+    }
 
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");

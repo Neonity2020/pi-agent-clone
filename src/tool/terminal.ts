@@ -3,12 +3,12 @@
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
-import { validateCommand, validateStringArg, validateNumberArg } from "../utils/security.js";
+import { validateCommand, validateStringArg, validateNumberArg, getSandboxRoot, resolveSandboxedPath } from "../utils/security.js";
 
 export const terminalTool: ToolHandler = {
   definition: {
     name: "terminal",
-    description: "Execute a shell command and return its output. Use for running builds, tests, git commands, and any shell operations.",
+    description: "Execute a shell command and return its output. Commands run within the sandbox directory. Use for running builds, tests, git commands, and any shell operations.",
     parameters: {
       type: "object",
       properties: {
@@ -22,7 +22,7 @@ export const terminalTool: ToolHandler = {
         },
         workdir: {
           type: "string",
-          description: "Working directory for the command",
+          description: "Working directory for the command (must be within sandbox)",
         },
       },
       required: ["command"],
@@ -32,7 +32,16 @@ export const terminalTool: ToolHandler = {
   async execute(args: Record<string, unknown>): Promise<string> {
     const command = validateStringArg(args.command, "command");
     const timeout = validateNumberArg(args.timeout ?? 30, "timeout", 1, 300) * 1000;
-    const workdir = args.workdir as string | undefined;
+
+    // Resolve workdir within sandbox (default to sandbox root)
+    let workdir: string;
+    try {
+      workdir = args.workdir
+        ? resolveSandboxedPath(args.workdir as string)
+        : getSandboxRoot();
+    } catch (err: any) {
+      return `Security: ${err.message}`;
+    }
 
     // Security: validate command for dangerous patterns
     const validation = validateCommand(command);

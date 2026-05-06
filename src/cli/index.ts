@@ -38,6 +38,10 @@ import { dirname, resolve } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 dotenvConfig({ path: resolve(__dirname, "../../.env") });
+
+// Initialize sandbox to the directory where neonity was launched
+import { setSandboxRoot, getSandboxRoot } from "../utils/security.js";
+setSandboxRoot(process.cwd());
 import * as readline from "readline";
 import { AgentLoop } from "../agent/loop.js";
 import { listProviders } from "../provider/registry.js";
@@ -354,6 +358,7 @@ async function main() {
   console.log(c.bold.cyan("  ╚══════════════════════════════════════╝"));
   console.log("");
   console.log(`  ${c.cyan("Model:")}   ${c.bold(model.name)} ${c.dim(`(${model.provider})`)}`);
+  console.log(`  ${c.cyan("Sandbox:")} ${c.yellow(getSandboxRoot())}`);
   console.log(`  ${c.cyan("Tools:")}   ${c.dim(allTools.map((t) => t.definition.name).join(", "))}`);
   console.log(`  ${c.cyan("Memory:")}  ${c.magenta(`${memStats.entries} entries`)} ${c.dim(memStats.path)}`);
   if (costRouter) {

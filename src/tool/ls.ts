@@ -1,10 +1,11 @@
 // ============================================================================
-// Built-in tool: ls — list directory contents
+// Built-in tool: ls — list directory contents (with path sandboxing)
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
 import { readdir, stat } from "fs/promises";
 import { join, relative, extname, basename } from "path";
+import { resolveSandboxedPath } from "../utils/security.js";
 
 interface FileInfo {
   name: string;
@@ -61,7 +62,7 @@ export const lsTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const path = (args.path as string) || ".";
+    const rawPath = (args.path as string) || ".";
     const recursive = (args.recursive as boolean) || false;
     let maxDepth = (args.maxDepth as number) || 3;
     const includeHidden = (args.includeHidden as boolean) || false;
@@ -70,9 +71,17 @@ export const lsTool: ToolHandler = {
 
     if (maxDepth === -1) maxDepth = Infinity;
 
+    // Security: resolve path within sandbox
+    let safePath: string;
+    try {
+      safePath = resolveSandboxedPath(rawPath);
+    } catch (err: any) {
+      return `Security: ${err.message}`;
+    }
+
     try {
       const dirInfo = await scanDirectory(
-        path,
+        safePath,
         recursive,
         maxDepth,
         includeHidden,
@@ -86,7 +95,7 @@ export const lsTool: ToolHandler = {
           return formatAsTable(dirInfo);
         case "tree":
         default:
-          return formatAsTree(dirInfo, path);
+          return formatAsTree(dirInfo, safePath);
       }
     } catch (err: any) {
       return `Error listing directory: ${err.message}`;

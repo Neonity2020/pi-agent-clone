@@ -1,8 +1,9 @@
 // ============================================================================
-// Built-in tool: git_log — show commit logs
+// Built-in tool: git_log — show commit logs (with path sandboxing)
 // ============================================================================
 
 import type { ToolHandler } from "../types.js";
+import { resolveSandboxedPath, getSandboxRoot } from "../utils/security.js";
 
 export const gitLogTool: ToolHandler = {
   definition: {
@@ -13,7 +14,7 @@ export const gitLogTool: ToolHandler = {
       properties: {
         path: {
           type: "string",
-          description: "Repository path (defaults to current directory)",
+          description: "Repository path (defaults to sandbox root)",
         },
         max_count: {
           type: "number",
@@ -28,9 +29,16 @@ export const gitLogTool: ToolHandler = {
   },
 
   async execute(args: Record<string, unknown>): Promise<string> {
-    const path = args.path as string | undefined;
+    const rawPath = args.path as string | undefined;
     const maxCount = (args.max_count as number) || 10;
     const oneline = args.oneline as boolean | undefined;
+
+    let safePath: string;
+    try {
+      safePath = rawPath ? resolveSandboxedPath(rawPath) : getSandboxRoot();
+    } catch (err: any) {
+      return `Security: ${err.message}`;
+    }
 
     const { execFile } = await import("child_process");
     const { promisify } = await import("util");
@@ -39,7 +47,7 @@ export const gitLogTool: ToolHandler = {
     try {
       const gitArgs = [
         "-C",
-        path || ".",
+        safePath,
         "log",
         `--max-count=${maxCount}`,
         oneline ? "--oneline" : "--pretty=format:%h - %an, %ar : %s",
@@ -50,7 +58,7 @@ export const gitLogTool: ToolHandler = {
         timeout: 10000,
       });
 
-      let output = `Git Log for: ${path || "current directory"} (last ${maxCount} commits)\n`;
+      let output = `Git Log for: ${safePath} (last ${maxCount} commits)\n`;
       output += "=" .repeat(60) + "\n\n";
 
       if (!stdout.trim()) {
@@ -63,7 +71,7 @@ export const gitLogTool: ToolHandler = {
       // Get commit count
       const { stdout: countStdout } = await execFileAsync(
         "git",
-        ["-C", path || ".", "rev-list", "--count", "HEAD"],
+        ["-C", safePath, "rev-list", "--count", "HEAD"],
         { timeout: 5000 },
       );
 
