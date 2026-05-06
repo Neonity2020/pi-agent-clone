@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "md-to-pdf": "^5.2.5",
     "tsx": "^4.19.0",
     "typescript": "^5.8.3"
   }

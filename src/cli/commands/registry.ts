@@ -66,7 +66,7 @@ export interface CommandContext {
 
 // ---- Command definition ----------------------------------------------------
 
-export type CommandCategory = "session" | "config" | "memory" | "info";
+export type CommandCategory = "session" | "config" | "memory" | "info" | "skills";
 
 export interface CommandDef {
   /** Primary name (without /) */
@@ -136,6 +136,7 @@ const CATEGORY_LABELS: Record<CommandCategory, string> = {
   config:  "Configuration",
   memory:  "Memory",
   info:    "Info",
+  skills:  "Skills",
 };
 
 const CATEGORY_ICONS: Record<CommandCategory, string> = {
@@ -143,6 +144,7 @@ const CATEGORY_ICONS: Record<CommandCategory, string> = {
   config:  "⚙",
   memory:  "🧠",
   info:    "ℹ",
+  skills:  "🎯",
 };
 
 export function formatHelp(): string {

@@ -29,6 +29,7 @@ import { getTransportForModel } from "../provider/registry.js";
 import { trimMessages, getContextInfo } from "../context/index.js";
 import { formatMemoryForPrompt } from "../memory/index.js";
 import { formatSoulForPrompt } from "../soul/index.js";
+import { formatSkillsForPrompt } from "../skill/index.js";
 
 export class AgentLoop {
   private config: AgentConfig;
@@ -102,7 +103,7 @@ export class AgentLoop {
     const memoryContent = await formatMemoryForPrompt();
 
     if (!memoryContent) {
-      return basePrompt + soulSection + modelInfoSection;
+      return basePrompt + soulSection + modelInfoSection + formatSkillsForPrompt();
     }
 
     // Inject memory into system prompt
@@ -120,7 +121,7 @@ export class AgentLoop {
       "",
     ].join("\n");
 
-    return basePrompt + soulSection + modelInfoSection + memorySection;
+    return basePrompt + soulSection + modelInfoSection + memorySection + formatSkillsForPrompt();
   }
 
   /**

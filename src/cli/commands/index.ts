@@ -6,6 +6,7 @@
 // Add new command files here as you create them.
 
 import "./model.js";
+import "../../skill/commands/index.js";
 
 // Re-export the registry API for use by the REPL
 export {

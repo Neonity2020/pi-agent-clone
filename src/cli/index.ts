@@ -61,6 +61,7 @@ import { ThinkRenderer } from "./think-render.js";
 import { renderMarkdown, renderInline, chalk } from "./markdown.js";
 import type { AgentConfig, AgentEvent } from "../types.js";
 import { CostRouter, type RouterStrategy } from "../router/index.js";
+import { discoverAndRegister, getSlashCommand, getAllSlashCommands, formatSlashCommandHelp } from "../skill/index.js";
 
 // ---- Chalk shortcuts --------------------------------------------------------
 
@@ -350,6 +351,9 @@ async function main() {
   // Check memory status at startup
   const memStats = await getMemoryStats();
 
+  // Discover skills and slash commands
+  const skillInfo = await discoverAndRegister();
+
   // ── Pretty banner ────────────────────────────────────────────────────────
   // Use simple ASCII to avoid alignment issues across different terminals
   console.log("");
@@ -361,6 +365,9 @@ async function main() {
   console.log(`  ${c.cyan("Sandbox:")} ${c.yellow(getSandboxRoot())}`);
   console.log(`  ${c.cyan("Tools:")}   ${c.dim(allTools.map((t) => t.definition.name).join(", "))}`);
   console.log(`  ${c.cyan("Memory:")}  ${c.magenta(`${memStats.entries} entries`)} ${c.dim(memStats.path)}`);
+  if (skillInfo.skillsLoaded > 0 || skillInfo.commandsLoaded > 0) {
+    console.log(`  ${c.cyan("Skills:")}   ${c.magenta(`${skillInfo.skillsLoaded} skills`)}, ${c.magenta(`${skillInfo.commandsLoaded} commands`)}`);
+  }
   if (costRouter) {
     console.log(`  ${c.cyan("Router:")}   ${c.bold.yellow("ON")} ${c.dim("M2.7 → GLM-5.1 (threshold=4)")}`);
   }
@@ -384,6 +391,44 @@ async function main() {
 
       // Slash commands
       if (trimmed.startsWith("/")) {
+        // Slash command routing: /project:xxx or /user:xxx
+        const slashMatch = trimmed.match(/^\/(project|user):(\S+)(?:\s+(.*))?$/s);
+        if (slashMatch) {
+          const [, prefix, cmdName, restArgs] = slashMatch;
+          const cmd = getSlashCommand(prefix!, cmdName!);
+          if (cmd) {
+            const promptText = cmd.prompt.replace(/\$ARGUMENTS/g, restArgs || "");
+            // Run the slash command as a user message to the agent
+            try {
+              let spinnerIdx = 0;
+              const spinnerInterval = setInterval(() => {
+                const frame = SPINNER_FRAMES[spinnerIdx % SPINNER_FRAMES.length];
+                process.stdout.write(`\r  ${c.dim(frame + " Thinking...")}`);
+                spinnerIdx++;
+              }, 80);
+
+              const result = await agent.run(promptText, (event: AgentEvent) => {
+                handleEvent(event, spinnerInterval);
+              });
+
+              clearInterval(spinnerInterval);
+              process.stdout.write("\r" + " ".repeat(30) + "\r");
+
+              console.log(c.dim(
+                `─── done ${c.gray("│")} ${result.iterations} turns ` +
+                `${c.gray("│")} ${result.totalUsage.inputTokens}+${result.totalUsage.outputTokens} tokens ───`
+              ));
+              console.log();
+            } catch (err) {
+              console.error(c.error(`Error: ${err instanceof Error ? err.message : err}`));
+            }
+          } else {
+            console.log(c.error(`Unknown command: /${prefix}:${cmdName}`));
+          }
+          prompt();
+          return;
+        }
+
         // Router commands (only when router is active)
         if (costRouter && trimmed.startsWith("/router")) {
           await handleRouterCommand(trimmed, costRouter, config);
