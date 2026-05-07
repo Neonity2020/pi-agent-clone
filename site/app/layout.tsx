@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Pi-Agent Clone | Autonomous Coding Agent',
+  title: 'Neonity Agent | Autonomous Coding Agent',
   description:
     'A modern AI coding agent with multi-provider support for OpenAI, Anthropic, Gemini, and more.',
 };

@@ -162,17 +162,41 @@ export function ChatContainer({
                 if (Object.keys(patch).length > 0) {
                   updateAsst(patch);
                 }
-                if (event.message && Array.isArray(event.message.toolCalls)) {
+                if (event.message && Array.isArray(event.message.toolCalls) && event.message.toolCalls.length > 0) {
                   setMessages((prev) => prev.map((m) => {
                     if (m.id !== asstId) return m;
-                    const updatedToolCalls = m.toolCalls.map((t) => {
-                      const incoming = event.message.toolCalls.find((inTc: any) => inTc.id === t.id);
-                      if (incoming) {
-                        return { ...t, arguments: incoming.arguments };
+                    const updated = [...m.toolCalls];
+                    for (const inTc of event.message.toolCalls) {
+                      // Try to find a matching existing tool call:
+                      // 1. By ID match
+                      let idx = inTc.id ? updated.findIndex((t) => t.id === inTc.id) : -1;
+                      // 2. Fallback: find the first tool call with same name but empty/missing arguments
+                      //    (these are the ones created by tool_call_start with args="")
+                      if (idx === -1) {
+                        for (let i = 0; i < updated.length; i++) {
+                          if (updated[i].name === inTc.name && (!updated[i].arguments || updated[i].arguments === "")) {
+                            idx = i;
+                            break;
+                          }
+                        }
                       }
-                      return t;
-                    });
-                    return { ...m, toolCalls: updatedToolCalls };
+                      if (idx !== -1) {
+                        // Update existing entry: fill in id, arguments, but preserve result/isError
+                        updated[idx] = {
+                          ...updated[idx],
+                          id: inTc.id || updated[idx].id,
+                          arguments: inTc.arguments || updated[idx].arguments,
+                        };
+                      } else {
+                        // New tool call not seen via tool_call_start — append it
+                        updated.push({
+                          id: inTc.id,
+                          name: inTc.name || "unknown",
+                          arguments: inTc.arguments,
+                        });
+                      }
+                    }
+                    return { ...m, toolCalls: updated };
                   }));
                 }
                 break;
@@ -180,11 +204,20 @@ export function ChatContainer({
 
               case "tool_call_start":
                 setIsThinking(false);
-                setMessages((prev) => prev.map((m) =>
-                  m.id === asstId
-                    ? { ...m, toolCalls: [...m.toolCalls, { id: event.toolCall?.id, name: event.toolCall?.name || "unknown", arguments: event.toolCall?.arguments }] }
-                    : m
-                ));
+                setMessages((prev) => prev.map((m) => {
+                  if (m.id !== asstId) return m;
+                  const tcId = event.toolCall?.id;
+                  const tcName = event.toolCall?.name || "unknown";
+                  // Check if this tool call already exists (GLM may emit multiple starts for same tool)
+                  const existingIdx = tcId ? m.toolCalls.findIndex((t) => t.id === tcId) : -1;
+                  if (existingIdx !== -1) {
+                    // Update existing entry
+                    const updated = [...m.toolCalls];
+                    updated[existingIdx] = { ...updated[existingIdx], name: tcName || updated[existingIdx].name };
+                    return { ...m, toolCalls: updated };
+                  }
+                  return { ...m, toolCalls: [...m.toolCalls, { id: tcId, name: tcName, arguments: event.toolCall?.arguments }] };
+                }));
                 break;
 
               case "tool_call_result":

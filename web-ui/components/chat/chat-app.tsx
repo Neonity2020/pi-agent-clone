@@ -51,7 +51,7 @@ export function ChatApp() {
       />
       <main className="chat-page">
         <header className="chat-header">
-          <a href="/" className="brand">Pi-Agent Clone</a>
+          <a href="/" className="brand">Neonity Agent</a>
           {isTestMode && <span className="badge">Test Mode</span>}
           <span className="badge">Web Chat</span>
         </header>
