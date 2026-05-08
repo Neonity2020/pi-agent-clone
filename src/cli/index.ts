@@ -395,14 +395,14 @@ async function main() {
           if (cmd) {
             const promptText = cmd.prompt.replace(/\$ARGUMENTS/g, restArgs || "");
             // Run the slash command as a user message to the agent
-            try {
-              let spinnerIdx = 0;
-              const spinnerInterval = setInterval(() => {
-                const frame = SPINNER_FRAMES[spinnerIdx % SPINNER_FRAMES.length];
-                process.stdout.write(`\r  ${c.dim(frame + " Thinking...")}`);
-                spinnerIdx++;
-              }, 80);
+            let spinnerIdx = 0;
+            const spinnerInterval = setInterval(() => {
+              const frame = SPINNER_FRAMES[spinnerIdx % SPINNER_FRAMES.length];
+              process.stdout.write(`\r  ${c.dim(frame + " Thinking...")}`);
+              spinnerIdx++;
+            }, 80);
 
+            try {
               const result = await agent.run(promptText, (event: AgentEvent) => {
                 handleEvent(event, spinnerInterval);
               });
