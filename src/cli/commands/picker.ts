@@ -131,7 +131,7 @@ export async function pick(
 
       const cleanup = (value: PickerItem | null) => {
         // Restore terminal state
-        process.stdin.setRawMode(savedRaw ?? false);
+        process.stdin.setRawMode(false);
         process.stdout.write(C.showCursor);
 
         // Clear picker frame from screen

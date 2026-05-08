@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/cli/index.ts",
+    "cli": "tsx src/cli/index.ts",
     "start": "node dist/cli/index.js",
     "typecheck": "tsc --noEmit"
   },

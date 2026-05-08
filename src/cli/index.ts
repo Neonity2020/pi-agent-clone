@@ -147,7 +147,7 @@ ${c.bold("Long-term memory:")}
 // ---- Built-in slash commands (non-registry) --------------------------------
 // These are session-control commands that don't fit the CommandContext pattern
 
-function handleBuiltinCommand(cmd: string, agent: AgentLoop, config: AgentConfig): boolean {
+async function handleBuiltinCommand(cmd: string, agent: AgentLoop, config: AgentConfig): Promise<boolean> {
   const parts = cmd.split(/\s+/);
 
   switch (parts[0]) {
@@ -173,32 +173,28 @@ function handleBuiltinCommand(cmd: string, agent: AgentLoop, config: AgentConfig
     }
 
     case "/memory": {
-      (async () => {
-        const stats = await getMemoryStats();
-        console.log(c.magenta(`Memory: ${stats.entries} entries`));
-        console.log(c.dim(`Path: ${stats.path}`));
-        const content = await formatMemoryForPrompt();
-        if (content) {
-          console.log(content);
-        } else {
-          console.log(c.dim("(empty)"));
-        }
-      })();
+      const stats = await getMemoryStats();
+      console.log(c.magenta(`Memory: ${stats.entries} entries`));
+      console.log(c.dim(`Path: ${stats.path}`));
+      const content = await formatMemoryForPrompt();
+      if (content) {
+        console.log(content);
+      } else {
+        console.log(c.dim("(empty)"));
+      }
       return true;
     }
 
     case "/status": {
-      (async () => {
-        const stats = await getMemoryStats();
-        const lines = [
-          `${c.bold("Status")}`,
-          `  ${c.cyan("Model:")}      ${config.model.name} ${c.dim(`(${config.model.provider})`)}`,
-          `  ${c.cyan("Messages:")}   ${agent.getMessages().length}`,
-          `  ${c.cyan("Max iter:")}   ${config.maxIterations}`,
-          `  ${c.cyan("Memory:")}     ${stats.entries} entries ${c.dim(`(${stats.sizeBytes} bytes)`)}`,
-        ];
-        console.log(lines.join("\n"));
-      })();
+      const stats = await getMemoryStats();
+      const lines = [
+        `${c.bold("Status")}`,
+        `  ${c.cyan("Model:")}      ${config.model.name} ${c.dim(`(${config.model.provider})`)}`,
+        `  ${c.cyan("Messages:")}   ${agent.getMessages().length}`,
+        `  ${c.cyan("Max iter:")}   ${config.maxIterations}`,
+        `  ${c.cyan("Memory:")}     ${stats.entries} entries ${c.dim(`(${stats.sizeBytes} bytes)`)}`,
+      ];
+      console.log(lines.join("\n"));
       return true;
     }
 
@@ -420,6 +416,8 @@ async function main() {
               ));
               console.log();
             } catch (err) {
+              clearInterval(spinnerInterval);
+              process.stdout.write("\r" + " ".repeat(30) + "\r");
               console.error(c.error(`Error: ${err instanceof Error ? err.message : err}`));
             }
           } else {
@@ -437,7 +435,7 @@ async function main() {
         }
 
         // Try built-in commands first (session control)
-        if (handleBuiltinCommand(trimmed, agent, config)) {
+        if (await handleBuiltinCommand(trimmed, agent, config)) {
           prompt();
           return;
         }
@@ -561,16 +559,18 @@ function handleEvent(event: AgentEvent, spinnerInterval?: NodeJS.Timeout): void 
       messageBuffer += event.delta; // Buffer raw text for markdown rendering
 
       // During streaming, show think content immediately (colored)
-      // but buffer normal text for markdown rendering
       if (thinkRenderer.isInThink()) {
         process.stdout.write(c.think(rendered));
         inThinkBlock = true;
-      } else if (inThinkBlock) {
-        // Transition from think to normal — flush think
-        process.stdout.write(c.think(thinkRenderer.flush()));
-        inThinkBlock = false;
+      } else {
+        if (inThinkBlock) {
+          // Transition from think to normal — flush think
+          process.stdout.write(c.think(thinkRenderer.flush()));
+          inThinkBlock = false;
+        }
+        // Normal text: print it as it arrives for real-time feedback
+        process.stdout.write(rendered);
       }
-      // Normal text: we DON'T print it during streaming — wait for message_done
       break;
     }
 
